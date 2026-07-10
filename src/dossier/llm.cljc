@@ -1,0 +1,202 @@
+(ns dossier.llm
+  "Dossier-LLM client — the *contained intelligence node*.
+
+  It normalizes registry-upsert patches, drafts relationship edges between
+  entities, proposes disclosure column sets for a licensed query, and drafts
+  correction resolutions. CRITICAL: it is a smart-but-untrusted advisor. It
+  returns a *proposal* (with a rationale + the fields/source it cited), never
+  a committed or disclosed record. Every output is censored downstream by
+  `dossier.policy` (the DisclosureGovernor) before anything touches the SSoT
+  or leaves the actor.
+
+  Like `cloud-itonami-6310`'s HR-LLM, this is a deterministic mock so the
+  actor graph runs offline and the governor contract is exercised end-to-end.
+  In production this calls a real LLM (kotoba-llm) with the same proposal
+  shape.
+
+  Proposal shape (all kinds):
+    {:summary    str            ; human-facing draft / finding
+     :rationale  str            ; why — SCANNED by the source-basis gate
+     :cites      [kw|str ..]    ; fields/attrs the LLM used
+     :source     {:class kw :ref str}|nil ; citation — SCANNED by source-basis
+     :effect     kw             ; how a commit would mutate the SSoT
+     :value      map|nil        ; the record patch/edge, for upsert/relationship
+     :columns    [kw ..]|nil    ; proposed disclosure column set
+     :stake      kw|nil         ; :sanctions-flag/:government-official-subject/nil
+     :confidence 0..1}"
+  (:require #?(:clj  [clojure.edn :as edn]
+               :cljs [cljs.reader :as edn])
+            [clojure.string :as str]
+            [langchain.model :as model]
+            [dossier.store :as store]))
+
+(defn- flagged?
+  "True when `id` (a company or official id) is demo-flagged sanctions/PEP or
+  is a government official — the high-stakes signal the DisclosureGovernor
+  always escalates, regardless of confidence."
+  [db id]
+  (boolean (or (get-in (store/company db id) [:flags :sanctions?])
+               (= :government-official (:capacity (store/official db id))))))
+
+(defn- propose-upsert
+  "Registry upsert — the LLM only normalizes/validates the patch (adds no
+  new facts). `:leaky?` injects the failure mode we must defend against: a
+  private-life field (home address) sneaking into the patch — the
+  DisclosureGovernor's scope-gate must reject this outright."
+  [_db {:keys [entity-kind patch leaky?]}]
+  (let [effect (case entity-kind
+                 :company :upsert-company :official :upsert-official
+                 :agency :upsert-agency)
+        patch* (if leaky? (assoc patch :home-address "デモ住所1丁目(スキーマ外)") patch)]
+    {:summary   (str (name entity-kind) " レコード更新: " (:id patch*))
+     :rationale "出典引用済みの登記/届出事実の正規化のみ。新規事実の生成なし。"
+     :cites     (vec (keys (dissoc patch* :source)))
+     :source    (:source patch*)
+     :effect    effect
+     :value     patch*
+     :stake     nil
+     :confidence 0.95}))
+
+(defn- propose-relationship-draft
+  "Relationship-edge draft from source documents. `:bias?` injects the
+  failure mode this actor exists to catch: the LLM proposing an edge with NO
+  citation ('pattern-matched' instead of sourced) — the DisclosureGovernor's
+  source-basis gate must reject this regardless of how confident the LLM is."
+  [db {:keys [from to kind pct source as-of bias?]}]
+  (let [src (when-not bias? source)]
+    {:summary   (str from " → " to " (" (name kind) ") の関係を検出")
+     :rationale (if bias?
+                  "文書間の共通役員パターンからの推論(出典なし)。"
+                  (str "出典: " (pr-str source)))
+     :cites     (if bias? [] [:source])
+     :source    src
+     :effect    :add-relationship
+     :value     {:id (str from "-" to "-" (name kind))
+                 :from from :to to :kind kind :pct pct :source src :as-of as-of}
+     :stake     (when (or (flagged? db from) (flagged? db to)) :sanctions-flag)
+     ;; deliberately HIGH confidence even when bias? — proves the hard
+     ;; source-basis gate does not care about confidence at all.
+     :confidence (if bias? 0.9 0.85)}))
+
+(defn- propose-disclosure
+  "Disclosure column-set proposal for a licensed query. `:greedy?` injects
+  over-disclosure (pulls relationship/officials/flags columns beyond a
+  basic-tier contract) — the DisclosureGovernor's licensed-disclosure gate
+  must reject the excess columns."
+  [db {:keys [company-id greedy?]}]
+  (let [c (store/company db company-id)
+        base [:id :legal-name :jurisdiction :registration-no :status]
+        greedy-extra [:officials :relationships :flags]]
+    {:summary   (str "開示列提案: " company-id)
+     :rationale (if greedy? "分析に有用そうな列を広めに含めた。" "契約 tier に必要な最小列のみ。")
+     :cites     base
+     :source    nil
+     :effect    :disclosure-serve
+     :columns   (if greedy? (into base greedy-extra) base)
+     :stake     (when (get-in c [:flags :sanctions?]) :sanctions-flag)
+     :confidence 0.9}))
+
+(defn- propose-correction
+  "Correction/dispute resolution draft. The LLM may draft a proposed
+  resolution but this NEVER auto-applies — `dossier.policy` and
+  `dossier.phase` both structurally force every `:correction/request` to
+  human review (ADR-2607110400 §1, check #6), independent of confidence."
+  [_db {:keys [entity-kind target-id disputed-field claim]}]
+  {:summary   (str target-id " の " disputed-field " について訂正申立てへの解決案ドラフト")
+   :rationale (str "申立て内容: " claim "。出典による裏取りは人間レビューで行う。")
+   :cites     [disputed-field]
+   :source    nil
+   :effect    :correction-apply
+   :value     {:kind (case entity-kind
+                       :company :companies :official :officials :agency :agencies)
+               :patch {disputed-field claim}}
+   :stake     :correction-request
+   :confidence 0.5})
+
+(defn infer
+  "Route a request to the right proposal generator.
+  request: {:op kw :subject id ...op-specific...}"
+  [db {:keys [op] :as request}]
+  (case op
+    :record/upsert       (propose-upsert db request)
+    :relationship/draft  (propose-relationship-draft db request)
+    :disclosure/query    (propose-disclosure db request)
+    :correction/request  (propose-correction db request)
+    {:summary "未対応の操作" :rationale (str op) :cites [] :source nil
+     :effect :noop :stake nil :confidence 0.0}))
+
+;; ───────────────────────── Advisor protocol ─────────────────────────
+;; The advisor is injected into the OperationActor, so the contained
+;; intelligence node is a swap: a deterministic mock for dev/tests, or a real
+;; LLM in production. Either way its output is a PROPOSAL the
+;; DisclosureGovernor still censors — the single invariant never depends on
+;; which advisor ran.
+
+(defprotocol Advisor
+  (-advise [advisor store request] "store + request → proposal map"))
+
+(defn mock-advisor
+  "The deterministic advisor (the `infer` logic above). Default everywhere."
+  [] (reify Advisor (-advise [_ st req] (infer st req))))
+
+(def ^:private system-prompt
+  (str "あなたは企業・法人・役職者(職務上のみ)・関係性の情報アドバイザーです。"
+       "与えられた事実のみに基づき、提案を1つだけ EDN マップで返します。"
+       "説明や前置きは一切書かず、EDN だけを出力します。\n"
+       "キー: :summary(人向けドラフト) :rationale(根拠/必ず事実から) "
+       ":cites(使った事実キーのベクタ) :source({:class .. :ref ..}か nil) "
+       ":effect(:upsert-company|:upsert-official|:upsert-agency|:add-relationship|"
+       ":disclosure-serve|:correction-apply) :value(該当マップ) "
+       ":stake(:sanctions-flag 等/無ければ nil) :confidence(0..1)。\n"
+       "重要: 私生活・家族・思想信条・健康・性的指向・リアルタイム所在地に関する情報は"
+       "一切扱ってはいけません(スキーマにそのフィールドは存在しません)。"
+       "出典(:source)を伴わない事実・関係性は絶対に提案してはいけません。"))
+
+(defn- facts-for [st {:keys [op subject]}]
+  (case op
+    :relationship/draft {:from (:from op) :to (:to op)}
+    :disclosure/query   {:company (store/company st subject)}
+    {:entity (or (store/company st subject) (store/official st subject) (store/agency st subject))}))
+
+(defn- parse-proposal
+  "Parse the model's EDN proposal defensively. Any parse/shape failure yields
+  a safe low-confidence noop so the DisclosureGovernor escalates/holds — an
+  LLM hiccup can never auto-commit or auto-disclose."
+  [content]
+  (let [p (try (edn/read-string (str/trim (str content)))
+               (catch #?(:clj Exception :cljs :default) _ nil))]
+    (if (map? p)
+      (-> p
+          (update :cites #(vec (or % [])))
+          (update :confidence #(if (number? %) (double %) 0.0))
+          (update :effect #(or % :noop)))
+      {:summary "LLM応答を解釈できませんでした" :rationale (str content)
+       :cites [] :source nil :effect :noop :stake nil :confidence 0.0})))
+
+(defn llm-advisor
+  "An advisor backed by a `langchain.model/ChatModel` (real inference). Pass
+  `model/anthropic-model`, an OpenAI-compatible model (Ollama/vLLM/kotoba), or
+  `model/mock-model` for offline tests. `gen-opts` is forwarded to -generate."
+  ([chat-model] (llm-advisor chat-model {}))
+  ([chat-model gen-opts]
+   (reify Advisor
+     (-advise [_ st req]
+       (let [msgs [{:role :system :content system-prompt}
+                   {:role :user :content (str "操作: " (:op req)
+                                              "\n対象: " (:subject req)
+                                              "\n事実: " (pr-str (facts-for st req)))}]
+             resp (model/-generate chat-model msgs gen-opts)]
+         (parse-proposal (:content resp)))))))
+
+(defn trace
+  "Decision-grounded audit record — the LLM's interpretable rationale is a
+  key asset (dispute appeals, audits). Persisted to the :audit channel."
+  [request proposal]
+  {:t          :dossierllm-proposal
+   :op         (:op request)
+   :subject    (:subject request)
+   :summary    (:summary proposal)
+   :rationale  (:rationale proposal)
+   :cites      (:cites proposal)
+   :source     (:source proposal)
+   :confidence (:confidence proposal)})
