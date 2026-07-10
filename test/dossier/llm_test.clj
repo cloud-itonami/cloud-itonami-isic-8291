@@ -124,6 +124,21 @@
     (is (nil? (:stake p)))
     (is (>= (:confidence p) 0.9))))
 
+(deftest relationship-check-person-to-person-via-target-person-name
+  (testing "the target can be another named person (not a company) -- the adjuster/broker-vs-
+            claimant conflict-of-interest shape cloud-itonami-isic-6621/6622 need"
+    (let [db (store/seed-db)
+          p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                           :person-name "Jane Smith (demo)" :target-person-name "山田 一郎(デモ)"})]
+      (is (true? (get-in p [:value :related?])))
+      (is (= :business-contact (get-in p [:value :kind]))))))
+
+(deftest relationship-check-unrelated-person-to-person-is-clean
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                         :person-name "鈴木 次官(デモ)" :target-person-name "山田 一郎(デモ)"})]
+    (is (false? (get-in p [:value :related?])))))
+
 (deftest relationship-check-unknown-person-is-not-found
   (let [db (store/seed-db)
         p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"

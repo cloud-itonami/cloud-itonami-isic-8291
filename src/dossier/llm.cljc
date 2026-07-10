@@ -168,37 +168,43 @@
   "Two-party relationship proposal for a licensed conflict-of-interest query
   (ADR-2607110400 addendum 4): does the NAMED person (`:person-name`,
   exact-match via `official-by-name`) have a professional-capacity
-  relationship with the target company (`:company-id`/`:company-name`) —
-  either serving as an official AT that entity (`:org` match) or connected
-  by a direct relationship edge (one hop only; R0 does not walk multi-hop
-  chains, and does not infer a relationship from a shared employer/owner
-  alone). Result columns (`:related?` `:kind`) require `:tier/graph`."
-  [db {:keys [person-name company-id company-name]}]
+  relationship with a target — a company (`:company-id`/`:company-name`,
+  matched by serving as an official AT that entity or a direct edge) OR
+  ANOTHER named person (`:target-person-name`, e.g. adjuster-vs-claimant or
+  broker-vs-client conflict-of-interest checks, matched by a direct edge
+  between the two officials — `relationships-of` is entity-kind-agnostic,
+  so this is the same edge lookup, just resolving the target id via
+  `official-by-name` instead of `company`/`company-by-name`). One hop only
+  (R0 does not walk multi-hop chains, and does not infer a relationship
+  from a shared employer/owner alone). Result columns (`:related?` `:kind`)
+  require `:tier/graph`."
+  [db {:keys [person-name company-id company-name target-person-name]}]
   (let [p (store/official-by-name db person-name)
-        c (or (and company-id (store/company db company-id))
-              (and company-name (store/company-by-name db company-name)))
-        cid (:id c)
+        target (or (and company-id (store/company db company-id))
+                   (and company-name (store/company-by-name db company-name))
+                   (and target-person-name (store/official-by-name db target-person-name)))
+        cid (:id target)
         org-match? (and p cid (= cid (:org p)))
         edge (when (and p cid)
                (some #(when (or (= cid (:to %)) (= cid (:from %))) %)
                      (store/relationships-of db (:id p))))
         related? (boolean (or org-match? edge))]
-    {:summary   (str "関係性照会: " person-name " × " (or company-id company-name))
+    {:summary   (str "関係性照会: " person-name " × " (or company-id company-name target-person-name))
      :rationale (cond
                   (nil? p) "対象人物が見つかりません(未収載)。"
-                  (nil? c) "対象法人が見つかりません(未収載)。"
+                  (nil? target) "対象(法人または人物)が見つかりません(未収載)。"
                   related? "職務上の関係(所属または関係edge)が一致。"
                   :else "登録済みデータの範囲内で関係性なし。")
      :cites     [:official-by-name :relationships-of]
      :source    nil
      :effect    :disclosure-serve
      :columns   [:related? :kind]
-     :value     {:found? (boolean (and p c)) :related? related?
+     :value     {:found? (boolean (and p target)) :related? related?
                  :kind (cond org-match? :org-membership edge (:kind edge) :else nil)}
      :stake     (when (and related? (or (and cid (flagged? db cid))
                                          (and p (flagged? db (:id p)))))
                   :sanctions-flag)
-     :confidence (if (and p c) 0.9 0.85)}))
+     :confidence (if (and p target) 0.9 0.85)}))
 
 (defn- propose-correction
   "Correction/dispute resolution draft. The LLM may draft a proposed

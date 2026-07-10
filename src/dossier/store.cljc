@@ -103,7 +103,16 @@
      :as-of "2025-01-01"}
     {:id "rel-of1-director-co200" :from "of-1" :to "co-200" :kind :directorship
      :pct nil :source {:class :official-registry :ref "companies-house:demo"}
-     :as-of "2025-06-01"}]})
+     :as-of "2025-06-01"}
+    ;; a direct PERSON-to-PERSON edge (neither endpoint is a company) --
+    ;; exercises :disclosure/relationship-check's :target-person-name path,
+    ;; the shape cloud-itonami-isic-6621/6622's adjuster/broker-vs-claimant
+    ;; conflict-of-interest checks need (relationships-of is entity-kind-
+    ;; agnostic, so this needed no new edge shape, just a new resolution
+    ;; path for the target side).
+    {:id "rel-of2-business-contact-of1" :from "of-2" :to "of-1" :kind :business-contact
+     :pct nil :source {:class :official-registry :ref "companies-house:demo"}
+     :as-of "2025-08-01"}]})
 
 ;; ───────────────────────── MemStore (default) ─────────────────────────
 
