@@ -2,8 +2,9 @@
   "Dossier-LLM client — the *contained intelligence node*.
 
   It normalizes registry-upsert patches, drafts relationship edges between
-  entities, proposes disclosure column sets for a licensed query, and drafts
-  correction resolutions. CRITICAL: it is a smart-but-untrusted advisor. It
+  entities, proposes disclosure column sets for a licensed company query or
+  a licensed PEP/sanctions name screen, and drafts correction resolutions.
+  CRITICAL: it is a smart-but-untrusted advisor. It
   returns a *proposal* (with a rationale + the fields/source it cited), never
   a committed or disclosed record. Every output is censored downstream by
   `dossier.policy` (the DisclosureGovernor) before anything touches the SSoT
@@ -96,6 +97,30 @@
      :stake     (when (get-in c [:flags :sanctions?]) :sanctions-flag)
      :confidence 0.9}))
 
+(defn- propose-name-screen
+  "PEP/sanctions name-screening proposal for a licensed KYC query — the
+  actual query shape a consuming actor (e.g. cloud-itonami-isic-6910's
+  officer screening) needs: search by NAME, not by company id. Exact-match
+  only in R0 (`dossier.store/official-by-name`); no fuzzy/phonetic matching.
+  Result columns (`:hit?` `:capacity` `:org`) require at least
+  `:tier/compliance` — `dossier.policy/tier-columns` gates this the same way
+  as `propose-disclosure`."
+  [db {:keys [name]}]
+  (let [off (store/official-by-name db name)
+        hit? (boolean (and off (or (= :government-official (:capacity off))
+                                    (get-in (store/company db (:org off)) [:flags :sanctions?]))))]
+    {:summary   (str "名前スクリーニング: " name)
+     :rationale (if off
+                  "登録済み official レコードとの完全一致。capacity/所属法人の flags を照合。"
+                  "登録済み official レコードに完全一致なし(未収載 ≠ クリア)。")
+     :cites     [:official-by-name]
+     :source    nil
+     :effect    :disclosure-serve
+     :columns   [:hit? :capacity :org]
+     :value     {:found? (boolean off) :hit? hit? :capacity (:capacity off) :org (:org off)}
+     :stake     (when hit? :sanctions-flag)
+     :confidence (if off 0.9 0.5)}))
+
 (defn- propose-correction
   "Correction/dispute resolution draft. The LLM may draft a proposed
   resolution but this NEVER auto-applies — `dossier.policy` and
@@ -121,6 +146,7 @@
     :record/upsert       (propose-upsert db request)
     :relationship/draft  (propose-relationship-draft db request)
     :disclosure/query    (propose-disclosure db request)
+    :disclosure/screen-name (propose-name-screen db request)
     :correction/request  (propose-correction db request)
     {:summary "未対応の操作" :rationale (str op) :cites [] :source nil
      :effect :noop :stake nil :confidence 0.0}))

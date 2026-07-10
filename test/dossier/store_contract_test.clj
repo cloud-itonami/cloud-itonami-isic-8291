@@ -18,6 +18,8 @@
       (is (= {:sanctions? true} (:flags (store/company s "co-200"))))
       (is (= "co-100" (:org (store/official s "of-1"))))
       (is (= ["of-1"] (mapv :id (store/officials-of s "co-100"))))
+      (is (= "of-2" (:id (store/official-by-name s "Jane Smith (demo)"))))
+      (is (nil? (store/official-by-name s "誰でもない人(デモ)")))
       (is (= :government-official (:capacity (store/official s "of-3"))))
       (is (= "デモ規制当局" (:name (store/agency s "ag-1"))))
       (is (= 2 (count (store/all-companies s)))))))

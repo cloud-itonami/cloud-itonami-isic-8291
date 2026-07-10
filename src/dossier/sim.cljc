@@ -9,6 +9,9 @@
     op3a 開示クエリが未契約 tenant から                    → licensed-disclosure REJECT → hold
     op4  開示クエリの対象が制裁フラグ付き(重大・高確信)    → 人間承認へ escalate → approve → commit
     op5  訂正申立て(どの phase でも常に人間レビュー)      → escalate → approve → commit
+    op6  名前スクリーニング(cloud-itonami-isic-6910 等の  → 人間承認へ escalate → approve → commit
+         KYC統合が実際に呼ぶクエリ形。制裁フラグ付き法人の
+         officialをヒット)
 
   Run: clojure -M:dev:run"
   (:require [langgraph.graph :as g]
@@ -83,6 +86,11 @@
              {:op :correction/request :subject "co-100" :entity-kind :company
               :disputed-field :status :claim :inactive}
              officer true)
+
+    (line "\nop6  名前スクリーニング(KYC統合が呼ぶクエリ形。制裁フラグ付き法人のofficialを検索)")
+    (run-op! actor "op6"
+             {:op :disclosure/screen-name :subject "tenant-acme" :name "Jane Smith (demo)"}
+             {:actor-id "cl-3" :actor-role :client :tenant "tenant-acme"} true)
 
     (line "\n── 開示(governor が承認した tier/basic 列のみ) ──")
     (line (pr-str (report/render-profile db "co-100" [:id :legal-name :jurisdiction :status])))

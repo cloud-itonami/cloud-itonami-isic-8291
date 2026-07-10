@@ -46,17 +46,20 @@
   "actor-role → set of operations it may perform."
   {:analyst             #{:record/upsert :relationship/draft}
    :compliance-officer  #{:record/upsert :relationship/draft :correction/request}
-   :client              #{:disclosure/query}})
+   :client              #{:disclosure/query :disclosure/screen-name}})
 
 (def tier-columns
-  "For `:disclosure/query` — the columns each licensed contract tier may
-  see. Anything beyond this is over-disclosure (licensed-disclosure
-  violation), the disclosure-minimization analog of `cloud-itonami-6310`'s
-  `purpose-columns`."
-  (let [base #{:id :legal-name :jurisdiction :registration-no :status}]
+  "For `:disclosure/query`/`:disclosure/screen-name` — the columns each
+  licensed contract tier may see. Anything beyond this is over-disclosure
+  (licensed-disclosure violation), the disclosure-minimization analog of
+  `cloud-itonami-6310`'s `purpose-columns`. PEP/sanctions screening columns
+  (`:hit?`/`:capacity`/`:org`) require at least `:tier/compliance` — a
+  `:tier/basic` (registry-lookup) contract cannot run a name screen at all."
+  (let [base #{:id :legal-name :jurisdiction :registration-no :status}
+        screening #{:hit? :capacity :org}]
     {:tier/basic      base
-     :tier/compliance (into base #{:flags})
-     :tier/graph      (into base #{:flags :officials :relationships})}))
+     :tier/compliance (into base (into #{:flags} screening))
+     :tier/graph      (into base (into #{:flags :officials :relationships} screening))}))
 
 ;; ───────────────────────── checks ─────────────────────────
 
@@ -83,11 +86,14 @@
           :detail (str "出典が無いか許可された出典クラスでない: " (pr-str src))}]))))
 
 (defn- licensed-disclosure-violations
-  "`:disclosure/query` is only ever served against a Store-registered,
-  active contract — never against caller-asserted context. Over-disclosure
-  (columns beyond the contract's tier) is checked the same pass."
+  "`:disclosure/query`/`:disclosure/screen-name` are only ever served
+  against a Store-registered, active contract — never against
+  caller-asserted context. Over-disclosure (columns beyond the contract's
+  tier — for screening, this also structurally excludes `:tier/basic`,
+  since the screening columns aren't in that tier's allowed set at all) is
+  checked the same pass."
   [{:keys [op]} {:keys [tenant]} proposal st]
-  (when (= op :disclosure/query)
+  (when (contains? #{:disclosure/query :disclosure/screen-name} op)
     (let [c (when tenant (store/contract st tenant))]
       (if (or (nil? c) (not (:active? c)))
         [{:rule :licensed-disclosure :detail (str "有効な契約が無い: tenant=" tenant)}]

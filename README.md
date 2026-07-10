@@ -42,6 +42,18 @@ call; the schema simply has no such field, and a second runtime check
 one in. See `90-docs/adr/2607110400-*` in the superproject and
 `docs/adr/0001-architecture.md` here for the full reasoning.
 
+## Consuming this actor from another blueprint
+
+Two governed read ops are the actual product surface: `:disclosure/query`
+(a company profile, columns limited to your contract tier) and
+`:disclosure/screen-name` (PEP/sanctions name screening — requires at least
+`:tier/compliance`, exact-match only in R0). Both always run through the
+DisclosureGovernor's licensed-disclosure check — there is no bypass. The
+first real consumer is [`cloud-itonami-isic-6910`](https://github.com/cloud-itonami/cloud-itonami-isic-6910)'s
+officer KYC/sanctions screening (`formation.corporate-intel`); ten other
+blueprints declare `:corporate-intelligence` as an optional technology but
+do not yet call it (ADR-2607110400 addenda).
+
 See [`docs/DESIGN.md`](docs/DESIGN.md) for the full architecture and
 [`docs/adr/0001-architecture.md`](docs/adr/0001-architecture.md) for the
 decision record. See [`docs/business-model.md`](docs/business-model.md) and

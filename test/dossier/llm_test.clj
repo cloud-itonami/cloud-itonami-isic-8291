@@ -42,6 +42,31 @@
         greedy (llm/infer db {:op :disclosure/query :subject "co-100" :company-id "co-100" :greedy? true})]
     (is (< (count (:columns clean)) (count (:columns greedy))))))
 
+(deftest name-screen-finds-sanctioned-official-via-org-flag
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/screen-name :subject "tenant-acme" :name "Jane Smith (demo)"})]
+    (is (true? (get-in p [:value :hit?])))
+    (is (= :sanctions-flag (:stake p)))))
+
+(deftest name-screen-finds-government-official-via-capacity
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/screen-name :subject "tenant-acme" :name "鈴木 次官(デモ)"})]
+    (is (true? (get-in p [:value :hit?])))
+    (is (= :sanctions-flag (:stake p)))))
+
+(deftest name-screen-clean-official-is-no-hit
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/screen-name :subject "tenant-acme" :name "山田 一郎(デモ)"})]
+    (is (false? (get-in p [:value :hit?])))
+    (is (nil? (:stake p)))))
+
+(deftest name-screen-unknown-name-is-not-found-and-low-confidence
+  (testing "unmatched != cleared -- an unscreened name must not look like a clean hit"
+    (let [db (store/seed-db)
+          p (llm/infer db {:op :disclosure/screen-name :subject "tenant-acme" :name "誰でもない人(デモ)"})]
+      (is (false? (get-in p [:value :found?])))
+      (is (< (:confidence p) 0.6)))))
+
 (deftest correction-proposal-never-marks-high-confidence
   (let [db (store/seed-db)
         p (llm/infer db {:op :correction/request :subject "co-100" :entity-kind :company

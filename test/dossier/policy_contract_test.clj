@@ -88,6 +88,36 @@
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:licensed-disclosure} (-> (store/ledger db) first :basis))))))
 
+(deftest screen-name-requires-compliance-tier
+  (testing "a :tier/basic contract cannot run a name screen at all → HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "t6b"
+                    {:op :disclosure/screen-name :subject "tenant-basic" :name "Jane Smith (demo)"}
+                    {:actor-id "cl-1" :actor-role :client :tenant "tenant-basic"})]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:licensed-disclosure} (-> (store/ledger db) first :basis))))))
+
+(deftest screen-name-clean-official-commits-directly
+  (testing "a clean, high-confidence, non-high-stakes name screen auto-serves (it's a governed read)"
+    (let [[_db actor] (fresh)
+          res (exec-op actor "t6c"
+                    {:op :disclosure/screen-name :subject "tenant-acme" :name "山田 一郎(デモ)"}
+                    {:actor-id "cl-3" :actor-role :client :tenant "tenant-acme"})]
+      (is (= :commit (get-in res [:state :disposition]))))))
+
+(deftest screen-name-hit-escalates-then-human-decides
+  (testing "a name screen that hits a sanctions-flagged org interrupts for human approval"
+    (let [[db actor] (fresh)
+          r1 (exec-op actor "t6d"
+                   {:op :disclosure/screen-name :subject "tenant-acme" :name "Jane Smith (demo)"}
+                   {:actor-id "cl-3" :actor-role :client :tenant "tenant-acme"})]
+      (is (= :interrupted (:status r1)))
+      (is (= :high-stakes (-> r1 :state :audit last :reason)))
+      (let [r2 (g/run* actor {:approval {:status :approved :by "compliance-1"}}
+                       {:thread-id "t6d" :resume? true})]
+        (is (= :commit (get-in r2 [:state :disposition])))
+        (is (= :commit (-> (store/ledger db) last :disposition)))))))
+
 (deftest sanctions-flagged-subject-escalates-then-human-decides
   (testing "disclosure targeting a sanctions-flagged company interrupts for human approval"
     (let [[db actor] (fresh)

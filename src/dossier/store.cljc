@@ -33,6 +33,7 @@
   (company [s id])
   (all-companies [s])
   (official [s id])
+  (official-by-name [s name] "exact-match lookup by :name — the KYC/PEP screening query shape; no fuzzy matching in R0")
   (officials-of [s org-id] "officials whose :org is this company/agency id")
   (agency [s id])
   (relationships-of [s entity-id] "relationship edges touching this entity, either side")
@@ -88,6 +89,7 @@
   (company [_ id] (get-in @a [:companies id]))
   (all-companies [_] (sort-by :id (vals (:companies @a))))
   (official [_ id] (get-in @a [:officials id]))
+  (official-by-name [_ name] (first (filter #(= name (:name %)) (vals (:officials @a)))))
   (officials-of [_ org-id]
     (->> (vals (:officials @a)) (filter #(= org-id (:org %))) (sort-by :id)))
   (agency [_ id] (get-in @a [:agencies id]))
@@ -215,6 +217,11 @@
          (map #(pull->company (d/pull (d/db conn) company-pull [:company/id %])))
          (sort-by :id)))
   (official [_ id] (pull->official (d/pull (d/db conn) official-pull [:official/id id])))
+  (official-by-name [_ name]
+    (when-let [id (d/q '[:find ?id . :in $ ?name
+                         :where [?o :official/name ?name] [?o :official/id ?id]]
+                       (d/db conn) name)]
+      (pull->official (d/pull (d/db conn) official-pull [:official/id id]))))
   (officials-of [_ org-id]
     (->> (d/q '[:find [?id ...] :in $ ?org
                 :where [?o :official/org ?org] [?o :official/id ?id]]
