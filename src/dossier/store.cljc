@@ -31,6 +31,7 @@
 
 (defprotocol Store
   (company [s id])
+  (company-by-name [s name] "exact-match lookup by :legal-name — resolves a name-only reference (e.g. a subsidiary a consumer only has by name) to a company id")
   (all-companies [s])
   (official [s id])
   (official-by-name [s name] "exact-match lookup by :name — the KYC/PEP screening query shape; no fuzzy matching in R0")
@@ -63,7 +64,14 @@
     "co-200" {:id "co-200" :legal-name "Northwind Capital Holdings Ltd (demo)"
               :jurisdiction :gbr :registration-no "GBDEMO0002" :status :active
               :source {:class :official-registry :ref "companies-house:demo"}
-              :flags {:sanctions? true}}}
+              :flags {:sanctions? true}}
+    ;; a subsidiary whose OWN registry facts are clean, but whose ownership
+    ;; chain (see :relationships below) traces to the sanctions-flagged
+    ;; co-200 -- exists purely to exercise :disclosure/ownership-chain.
+    "co-300" {:id "co-300" :legal-name "出島サブシディアリ株式会社(デモ)"
+              :jurisdiction :jpn :registration-no "JPDEMO0003" :status :active
+              :source {:class :official-registry :ref "houjin-bangou:demo"}
+              :flags {}}}
    :officials
    {"of-1" {:id "of-1" :name "山田 一郎(デモ)" :title "代表取締役" :org "co-100"
             :capacity :director
@@ -80,13 +88,29 @@
    {"tenant-acme" {:tenant "tenant-acme" :tier :tier/compliance :active? true
                    :purpose :vendor-due-diligence}
     "tenant-basic" {:tenant "tenant-basic" :tier :tier/basic :active? true
-                    :purpose :registry-lookup}}})
+                    :purpose :registry-lookup}
+    "tenant-graph" {:tenant "tenant-graph" :tier :tier/graph :active? true
+                    :purpose :ownership-and-conflict-screening}}
+   ;; Seeded relationship edges (ADR-2607110400 addendum 4): co-200 (sanctions-
+   ;; flagged) owns 60% of co-300, and of-1 (co-100's director) ALSO sits on
+   ;; co-200's board -- an undisclosed-conflict-shaped scenario. These exist
+   ;; purely to exercise :disclosure/ownership-chain and :disclosure/
+   ;; relationship-check; they do not touch co-100 as an edge endpoint, so
+   ;; `(relationships-of "co-100")` stays empty as existing tests expect.
+   :relationships
+   [{:id "rel-co200-owns-co300" :from "co-200" :to "co-300" :kind :ownership
+     :pct 60 :source {:class :official-registry :ref "companies-house:demo"}
+     :as-of "2025-01-01"}
+    {:id "rel-of1-director-co200" :from "of-1" :to "co-200" :kind :directorship
+     :pct nil :source {:class :official-registry :ref "companies-house:demo"}
+     :as-of "2025-06-01"}]})
 
 ;; ───────────────────────── MemStore (default) ─────────────────────────
 
 (defrecord MemStore [a]
   Store
   (company [_ id] (get-in @a [:companies id]))
+  (company-by-name [_ name] (first (filter #(= name (:legal-name %)) (vals (:companies @a)))))
   (all-companies [_] (sort-by :id (vals (:companies @a))))
   (official [_ id] (get-in @a [:officials id]))
   (official-by-name [_ name] (first (filter #(= name (:name %)) (vals (:officials @a)))))
@@ -116,9 +140,10 @@
   (with-contracts [s cts]    (when (seq cts) (swap! a assoc :contracts cts)) s))
 
 (defn seed-db
-  "A MemStore seeded with the demo data. The deterministic default."
+  "A MemStore seeded with the demo data (including its seeded relationship
+  edges — see `demo-data`). The deterministic default."
   []
-  (->MemStore (atom (assoc (demo-data) :relationships [] :ledger []))))
+  (->MemStore (atom (assoc (demo-data) :ledger []))))
 
 ;; ───────────────────────── DatomicStore (langchain.db) ─────────────────
 
@@ -212,6 +237,11 @@
 (defrecord DatomicStore [conn]
   Store
   (company [_ id] (pull->company (d/pull (d/db conn) company-pull [:company/id id])))
+  (company-by-name [_ name]
+    (when-let [id (d/q '[:find ?id . :in $ ?name
+                         :where [?c :company/legal-name ?name] [?c :company/id ?id]]
+                       (d/db conn) name)]
+      (pull->company (d/pull (d/db conn) company-pull [:company/id id]))))
   (all-companies [_]
     (->> (d/q '[:find [?id ...] :where [?e :company/id ?id]] (d/db conn))
          (map #(pull->company (d/pull (d/db conn) company-pull [:company/id %])))

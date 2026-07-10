@@ -118,6 +118,65 @@
         (is (= :commit (get-in r2 [:state :disposition])))
         (is (= :commit (-> (store/ledger db) last :disposition)))))))
 
+(deftest ownership-chain-requires-graph-tier-not-just-compliance
+  (testing "a :tier/compliance contract (not :tier/graph) cannot run an ownership-chain query → HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "t6e"
+                    {:op :disclosure/ownership-chain :subject "co-300" :company-id "co-300"}
+                    {:actor-id "cl-4" :actor-role :client :tenant "tenant-acme"})]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:licensed-disclosure} (-> (store/ledger db) first :basis))))))
+
+(deftest ownership-chain-flagged-owner-escalates-then-human-decides
+  (testing "an ownership chain tracing to a sanctions-flagged owner interrupts for human approval"
+    (let [[_db actor] (fresh)
+          r1 (exec-op actor "t6f"
+                   {:op :disclosure/ownership-chain :subject "co-300" :company-id "co-300"}
+                   {:actor-id "cl-4" :actor-role :client :tenant "tenant-graph"})]
+      (is (= :interrupted (:status r1)))
+      (is (= :high-stakes (-> r1 :state :audit last :reason)))
+      (let [r2 (g/run* actor {:approval {:status :approved :by "compliance-1"}}
+                       {:thread-id "t6f" :resume? true})]
+        (is (= :commit (get-in r2 [:state :disposition])))))))
+
+(deftest ownership-chain-clean-company-commits-directly
+  (let [[_db actor] (fresh)
+        res (exec-op actor "t6g"
+                  {:op :disclosure/ownership-chain :subject "co-100" :company-id "co-100"}
+                  {:actor-id "cl-4" :actor-role :client :tenant "tenant-graph"})]
+    (is (= :commit (get-in res [:state :disposition])))))
+
+(deftest relationship-check-requires-graph-tier-not-just-compliance
+  (testing "a :tier/compliance contract cannot run a relationship-check query → HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "t6h"
+                    {:op :disclosure/relationship-check :subject "of-1"
+                     :person-name "山田 一郎(デモ)" :company-id "co-100"}
+                    {:actor-id "cl-4" :actor-role :client :tenant "tenant-acme"})]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:licensed-disclosure} (-> (store/ledger db) first :basis))))))
+
+(deftest relationship-check-flagged-target-escalates-then-human-decides
+  (testing "a relationship check whose target is sanctions-flagged interrupts for human approval"
+    (let [[_db actor] (fresh)
+          r1 (exec-op actor "t6i"
+                   {:op :disclosure/relationship-check :subject "of-2"
+                    :person-name "Jane Smith (demo)" :company-id "co-200"}
+                   {:actor-id "cl-4" :actor-role :client :tenant "tenant-graph"})]
+      (is (= :interrupted (:status r1)))
+      (is (= :high-stakes (-> r1 :state :audit last :reason)))
+      (let [r2 (g/run* actor {:approval {:status :approved :by "compliance-1"}}
+                       {:thread-id "t6i" :resume? true})]
+        (is (= :commit (get-in r2 [:state :disposition])))))))
+
+(deftest relationship-check-clean-no-relationship-commits-directly
+  (let [[_db actor] (fresh)
+        res (exec-op actor "t6j"
+                  {:op :disclosure/relationship-check :subject "of-1"
+                   :person-name "山田 一郎(デモ)" :company-id "co-300"}
+                  {:actor-id "cl-4" :actor-role :client :tenant "tenant-graph"})]
+    (is (= :commit (get-in res [:state :disposition])))))
+
 (deftest sanctions-flagged-subject-escalates-then-human-decides
   (testing "disclosure targeting a sanctions-flagged company interrupts for human approval"
     (let [[db actor] (fresh)

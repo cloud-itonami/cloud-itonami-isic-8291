@@ -26,7 +26,8 @@
   (:commit | :escalate | :hold) and returning the phase-adjusted disposition
   plus a reason when the phase changed it.")
 
-(def read-ops  #{:disclosure/query :disclosure/screen-name})
+(def read-ops  #{:disclosure/query :disclosure/screen-name
+                 :disclosure/ownership-chain :disclosure/relationship-check})
 (def write-ops #{:record/upsert :relationship/draft :correction/request})
 
 (def phases

@@ -72,6 +72,65 @@
       (is (false? (get-in p [:value :hit?])))
       (is (>= (:confidence p) 0.6)))))
 
+(deftest ownership-chain-finds-flagged-owner
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/ownership-chain :subject "tenant-graph" :company-id "co-300"})]
+    (is (true? (get-in p [:value :has-sourced-ownership-data?])))
+    (is (= ["co-200"] (mapv :owner-id (get-in p [:value :owners]))))
+    (is (= :sanctions-flag (:stake p)))))
+
+(deftest ownership-chain-resolves-by-company-name
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/ownership-chain :subject "tenant-graph"
+                         :company-name "出島サブシディアリ株式会社(デモ)"})]
+    (is (= "co-300" (get-in p [:value :company-id])))
+    (is (true? (get-in p [:value :has-sourced-ownership-data?])))))
+
+(deftest ownership-chain-no-sourced-data-is-not-a-clean-verdict
+  (testing "no ownership edge on file != no beneficial owners exist -- just uncorroborated"
+    (let [db (store/seed-db)
+          p (llm/infer db {:op :disclosure/ownership-chain :subject "tenant-graph" :company-id "co-100"})]
+      (is (false? (get-in p [:value :has-sourced-ownership-data?])))
+      (is (empty? (get-in p [:value :owners])))
+      (is (nil? (:stake p))))))
+
+(deftest ownership-chain-unknown-company-is-not-found
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/ownership-chain :subject "tenant-graph" :company-id "co-999"})]
+    (is (nil? (get-in p [:value :company-id])))
+    (is (empty? (get-in p [:value :owners])))))
+
+(deftest relationship-check-finds-org-membership
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                         :person-name "Jane Smith (demo)" :company-id "co-200"})]
+    (is (true? (get-in p [:value :related?])))
+    (is (= :org-membership (get-in p [:value :kind])))
+    (is (= :sanctions-flag (:stake p)) "co-200 itself is sanctions-flagged")))
+
+(deftest relationship-check-finds-directorship-edge-not-org-membership
+  (testing "of-1's :org is co-100, but a separate directorship EDGE connects him to co-200 too"
+    (let [db (store/seed-db)
+          p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                           :person-name "山田 一郎(デモ)" :company-id "co-200"})]
+      (is (true? (get-in p [:value :related?])))
+      (is (= :directorship (get-in p [:value :kind]))))))
+
+(deftest relationship-check-no-relationship-is-clean-not-escalated
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                         :person-name "山田 一郎(デモ)" :company-id "co-300"})]
+    (is (false? (get-in p [:value :related?])))
+    (is (nil? (:stake p)))
+    (is (>= (:confidence p) 0.9))))
+
+(deftest relationship-check-unknown-person-is-not-found
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                         :person-name "誰でもない人(デモ)" :company-id "co-100"})]
+    (is (false? (get-in p [:value :found?])))
+    (is (false? (get-in p [:value :related?])))))
+
 (deftest correction-proposal-never-marks-high-confidence
   (let [db (store/seed-db)
         p (llm/infer db {:op :correction/request :subject "co-100" :entity-kind :company

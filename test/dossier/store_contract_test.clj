@@ -20,9 +20,18 @@
       (is (= ["of-1"] (mapv :id (store/officials-of s "co-100"))))
       (is (= "of-2" (:id (store/official-by-name s "Jane Smith (demo)"))))
       (is (nil? (store/official-by-name s "誰でもない人(デモ)")))
+      (is (= "co-300" (:id (store/company-by-name s "出島サブシディアリ株式会社(デモ)"))))
+      (is (nil? (store/company-by-name s "存在しない法人(デモ)")))
       (is (= :government-official (:capacity (store/official s "of-3"))))
       (is (= "デモ規制当局" (:name (store/agency s "ag-1"))))
-      (is (= 2 (count (store/all-companies s)))))))
+      (is (= 3 (count (store/all-companies s)))
+          "co-100, co-200, and the seeded co-300 subsidiary")
+      (is (= 2 (count (store/relationships-of s "co-200")))
+          "seeded: co-200 owns co-300, AND of-1 sits on co-200's board")
+      (is (= 1 (count (store/relationships-of s "co-300")))
+          "seeded: owned 60% by co-200")
+      (is (empty? (store/relationships-of s "co-100"))
+          "co-100 is untouched by any seeded edge"))))
 
 (deftest write-and-ledger-parity
   (doseq [[label s] (backends)]
@@ -37,8 +46,10 @@
                                  :value {:id "co-100-co-200-joint-venture" :from "co-100" :to "co-200"
                                          :kind :joint-venture :pct nil
                                          :source {:class :regulatory-filing :ref "demo"} :as-of "2026-01-01"}})
-        (is (= 1 (count (store/relationships-of s "co-100"))))
-        (is (= 1 (count (store/relationships-of s "co-200")))))
+        (is (= 1 (count (store/relationships-of s "co-100")))
+            "co-100 had zero seeded edges, plus this one new commit")
+        (is (= 3 (count (store/relationships-of s "co-200")))
+            "co-200 had 2 seeded edges (owns co-300, of-1 directorship), plus this one new commit"))
       (testing "correction-apply patches the target entity"
         (store/commit-record! s {:effect :correction-apply
                                  :value {:kind :companies :patch {:status :active}}

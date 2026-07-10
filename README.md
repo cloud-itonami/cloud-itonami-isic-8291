@@ -44,15 +44,29 @@ one in. See `90-docs/adr/2607110400-*` in the superproject and
 
 ## Consuming this actor from another blueprint
 
-Two governed read ops are the actual product surface: `:disclosure/query`
-(a company profile, columns limited to your contract tier) and
-`:disclosure/screen-name` (PEP/sanctions name screening — requires at least
-`:tier/compliance`, exact-match only in R0). Both always run through the
-DisclosureGovernor's licensed-disclosure check — there is no bypass. The
-first real consumer is [`cloud-itonami-isic-6910`](https://github.com/cloud-itonami/cloud-itonami-isic-6910)'s
-officer KYC/sanctions screening (`formation.corporate-intel`); ten other
-blueprints declare `:corporate-intelligence` as an optional technology but
-do not yet call it (ADR-2607110400 addenda).
+Four governed read ops are the actual product surface, all gated by the
+DisclosureGovernor's licensed-disclosure check (no bypass):
+
+| op | answers | min tier |
+|---|---|---|
+| `:disclosure/query` | a company profile (columns limited to your tier) | `:tier/basic` |
+| `:disclosure/screen-name` | is this NAMED person PEP/sanctions-flagged? (exact match only in R0) | `:tier/compliance` |
+| `:disclosure/ownership-chain` | who owns this company, per our sourced relationship data (one hop) | `:tier/graph` |
+| `:disclosure/relationship-check` | does this named person have a professional-capacity relationship with this company (org membership or a direct edge, one hop) | `:tier/graph` |
+
+Real consumers so far: [`cloud-itonami-isic-6910`](https://github.com/cloud-itonami/cloud-itonami-isic-6910)
+(company formation), [`-6810`](https://github.com/cloud-itonami/cloud-itonami-isic-6810)
+(real estate), [`-6499`](https://github.com/cloud-itonami/cloud-itonami-isic-6499)
+(VC fund), [`-6512`](https://github.com/cloud-itonami/cloud-itonami-isic-6512)
+(non-life insurance), and [`-6419`](https://github.com/cloud-itonami/cloud-itonami-isic-6419)
+(banking) all call `:disclosure/screen-name` from their own KYC/sanctions
+advisor. `:disclosure/ownership-chain` and `:disclosure/relationship-check`
+were added for [`-6420`](https://github.com/cloud-itonami/cloud-itonami-isic-6420)
+(holdco beneficial-ownership verification) and
+[`-6621`](https://github.com/cloud-itonami/cloud-itonami-isic-6621)/[`-6622`](https://github.com/cloud-itonami/cloud-itonami-isic-6622)
+(adjuster/broker conflict-of-interest) — wiring those three is a follow-up,
+not done yet. Five other pilot blueprints declare `:corporate-intelligence`
+as an optional technology without calling it (ADR-2607110400 addenda).
 
 See [`docs/DESIGN.md`](docs/DESIGN.md) for the full architecture and
 [`docs/adr/0001-architecture.md`](docs/adr/0001-architecture.md) for the

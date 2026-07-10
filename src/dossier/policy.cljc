@@ -46,20 +46,27 @@
   "actor-role → set of operations it may perform."
   {:analyst             #{:record/upsert :relationship/draft}
    :compliance-officer  #{:record/upsert :relationship/draft :correction/request}
-   :client              #{:disclosure/query :disclosure/screen-name}})
+   :client              #{:disclosure/query :disclosure/screen-name
+                          :disclosure/ownership-chain :disclosure/relationship-check}})
 
 (def tier-columns
-  "For `:disclosure/query`/`:disclosure/screen-name` — the columns each
-  licensed contract tier may see. Anything beyond this is over-disclosure
+  "For `:disclosure/query`/`:disclosure/screen-name`/`:disclosure/ownership-
+  chain`/`:disclosure/relationship-check` — the columns each licensed
+  contract tier may see. Anything beyond this is over-disclosure
   (licensed-disclosure violation), the disclosure-minimization analog of
   `cloud-itonami-6310`'s `purpose-columns`. PEP/sanctions screening columns
   (`:hit?`/`:capacity`/`:org`) require at least `:tier/compliance` — a
-  `:tier/basic` (registry-lookup) contract cannot run a name screen at all."
+  `:tier/basic` (registry-lookup) contract cannot run a name screen at all.
+  Relationship-graph columns (`:owners`/`:has-sourced-ownership-data?`/
+  `:related?`/`:kind`, ADR-2607110400 addendum 4) require `:tier/graph`,
+  same as `:officials`/`:relationships` — even a `:tier/compliance` contract
+  cannot run an ownership-chain or relationship-check query."
   (let [base #{:id :legal-name :jurisdiction :registration-no :status}
-        screening #{:hit? :capacity :org}]
+        screening #{:hit? :capacity :org}
+        graph-only #{:owners :has-sourced-ownership-data? :related? :kind}]
     {:tier/basic      base
      :tier/compliance (into base (into #{:flags} screening))
-     :tier/graph      (into base (into #{:flags :officials :relationships} screening))}))
+     :tier/graph      (into base (into #{:flags :officials :relationships} (into screening graph-only)))}))
 
 ;; ───────────────────────── checks ─────────────────────────
 
@@ -86,14 +93,16 @@
           :detail (str "出典が無いか許可された出典クラスでない: " (pr-str src))}]))))
 
 (defn- licensed-disclosure-violations
-  "`:disclosure/query`/`:disclosure/screen-name` are only ever served
-  against a Store-registered, active contract — never against
-  caller-asserted context. Over-disclosure (columns beyond the contract's
-  tier — for screening, this also structurally excludes `:tier/basic`,
-  since the screening columns aren't in that tier's allowed set at all) is
-  checked the same pass."
+  "`:disclosure/query`/`:disclosure/screen-name`/`:disclosure/ownership-
+  chain`/`:disclosure/relationship-check` are only ever served against a
+  Store-registered, active contract — never against caller-asserted
+  context. Over-disclosure (columns beyond the contract's tier — this also
+  structurally excludes `:tier/basic` from screening and `:tier/compliance`
+  from the two graph-only ops, since their columns aren't in those tiers'
+  allowed sets at all) is checked the same pass."
   [{:keys [op]} {:keys [tenant]} proposal st]
-  (when (contains? #{:disclosure/query :disclosure/screen-name} op)
+  (when (contains? #{:disclosure/query :disclosure/screen-name
+                     :disclosure/ownership-chain :disclosure/relationship-check} op)
     (let [c (when tenant (store/contract st tenant))]
       (if (or (nil? c) (not (:active? c)))
         [{:rule :licensed-disclosure :detail (str "有効な契約が無い: tenant=" tenant)}]

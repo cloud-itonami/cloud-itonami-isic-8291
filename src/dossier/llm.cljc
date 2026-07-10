@@ -130,6 +130,76 @@
      :stake     (when hit? :sanctions-flag)
      :confidence (if off 0.9 0.85)}))
 
+(defn- propose-ownership-chain
+  "Beneficial-ownership-chain proposal for a licensed query (ADR-2607110400
+  addendum 4): direct `:ownership`-kind relationship edges pointing AT the
+  target company — resolved by `:company-id` or, since a consuming actor
+  (e.g. a holding-company actor tracking a subsidiary only by name) may not
+  have an 8291 id on hand, by `:company-name` via `dossier.store/company-
+  by-name`. Answers 'who owns this entity, per our sourced relationship
+  data' — distinct from `propose-disclosure`'s company-profile shape, which
+  answers 'what are this entity's own registry facts'. One hop only (R0
+  does not walk multi-hop ownership chains). Result columns (`:owners`
+  `:has-sourced-ownership-data?`) require `:tier/graph`, same as
+  `:officials`/`:relationships` elsewhere."
+  [db {:keys [company-id company-name]}]
+  (let [c (or (and company-id (store/company db company-id))
+              (and company-name (store/company-by-name db company-name)))
+        cid (:id c)
+        owners (when cid (filter #(= cid (:to %)) (store/relationships-of db cid)))]
+    {:summary   (str "所有関係チェーン照会: " (or company-id company-name))
+     :rationale (cond
+                  (nil? c) "対象法人が見つかりません(未収載)。"
+                  (seq owners) "登録済み ownership edge との一致。"
+                  :else "対象法人は見つかったが、登録済み ownership edge が無い(未収載 ≠ 所有者なし)。")
+     :cites     [:relationships-of]
+     :source    nil
+     :effect    :disclosure-serve
+     :columns   [:owners :has-sourced-ownership-data?]
+     :value     {:company-id cid
+                 :has-sourced-ownership-data? (boolean (seq owners))
+                 :owners (mapv (fn [e] {:owner-id (:from e) :pct (:pct e)
+                                        :source (:source e) :as-of (:as-of e)})
+                               owners)}
+     :stake     (when (some #(flagged? db (:from %)) owners) :sanctions-flag)
+     :confidence (if (nil? c) 0.85 0.9)}))
+
+(defn- propose-relationship-check
+  "Two-party relationship proposal for a licensed conflict-of-interest query
+  (ADR-2607110400 addendum 4): does the NAMED person (`:person-name`,
+  exact-match via `official-by-name`) have a professional-capacity
+  relationship with the target company (`:company-id`/`:company-name`) —
+  either serving as an official AT that entity (`:org` match) or connected
+  by a direct relationship edge (one hop only; R0 does not walk multi-hop
+  chains, and does not infer a relationship from a shared employer/owner
+  alone). Result columns (`:related?` `:kind`) require `:tier/graph`."
+  [db {:keys [person-name company-id company-name]}]
+  (let [p (store/official-by-name db person-name)
+        c (or (and company-id (store/company db company-id))
+              (and company-name (store/company-by-name db company-name)))
+        cid (:id c)
+        org-match? (and p cid (= cid (:org p)))
+        edge (when (and p cid)
+               (some #(when (or (= cid (:to %)) (= cid (:from %))) %)
+                     (store/relationships-of db (:id p))))
+        related? (boolean (or org-match? edge))]
+    {:summary   (str "関係性照会: " person-name " × " (or company-id company-name))
+     :rationale (cond
+                  (nil? p) "対象人物が見つかりません(未収載)。"
+                  (nil? c) "対象法人が見つかりません(未収載)。"
+                  related? "職務上の関係(所属または関係edge)が一致。"
+                  :else "登録済みデータの範囲内で関係性なし。")
+     :cites     [:official-by-name :relationships-of]
+     :source    nil
+     :effect    :disclosure-serve
+     :columns   [:related? :kind]
+     :value     {:found? (boolean (and p c)) :related? related?
+                 :kind (cond org-match? :org-membership edge (:kind edge) :else nil)}
+     :stake     (when (and related? (or (and cid (flagged? db cid))
+                                         (and p (flagged? db (:id p)))))
+                  :sanctions-flag)
+     :confidence (if (and p c) 0.9 0.85)}))
+
 (defn- propose-correction
   "Correction/dispute resolution draft. The LLM may draft a proposed
   resolution but this NEVER auto-applies — `dossier.policy` and
@@ -156,6 +226,8 @@
     :relationship/draft  (propose-relationship-draft db request)
     :disclosure/query    (propose-disclosure db request)
     :disclosure/screen-name (propose-name-screen db request)
+    :disclosure/ownership-chain (propose-ownership-chain db request)
+    :disclosure/relationship-check (propose-relationship-check db request)
     :correction/request  (propose-correction db request)
     {:summary "未対応の操作" :rationale (str op) :cites [] :source nil
      :effect :noop :stake nil :confidence 0.0}))

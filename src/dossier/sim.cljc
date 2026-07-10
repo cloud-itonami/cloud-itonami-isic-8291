@@ -12,6 +12,11 @@
     op6  名前スクリーニング(cloud-itonami-isic-6910 等の  → 人間承認へ escalate → approve → commit
          KYC統合が実際に呼ぶクエリ形。制裁フラグ付き法人の
          officialをヒット)
+    op7  所有関係チェーン照会(co-300 の所有者が制裁フラグ  → 人間承認へ escalate → approve → commit
+         付きco-200と判明。cloud-itonami-isic-6420向け)
+    op8  二者間関係照会(officialが制裁フラグ付き法人の役員 → 人間承認へ escalate → approve → commit
+         を兼務。cloud-itonami-isic-6621/6622の利益相反
+         チェック向け)
 
   Run: clojure -M:dev:run"
   (:require [langgraph.graph :as g]
@@ -91,6 +96,17 @@
     (run-op! actor "op6"
              {:op :disclosure/screen-name :subject "tenant-acme" :name "Jane Smith (demo)"}
              {:actor-id "cl-3" :actor-role :client :tenant "tenant-acme"} true)
+
+    (line "\nop7  所有関係チェーン照会(co-300 は制裁フラグ付きco-200に60%所有されている)")
+    (run-op! actor "op7"
+             {:op :disclosure/ownership-chain :subject "co-300" :company-id "co-300"}
+             {:actor-id "cl-4" :actor-role :client :tenant "tenant-graph"} true)
+
+    (line "\nop8  二者間関係照会(山田一郎は co-100 の役員だが、co-200 の役員も兼務)")
+    (run-op! actor "op8"
+             {:op :disclosure/relationship-check :subject "of-1"
+              :person-name "山田 一郎(デモ)" :company-id "co-200"}
+             {:actor-id "cl-4" :actor-role :client :tenant "tenant-graph"} true)
 
     (line "\n── 開示(governor が承認した tier/basic 列のみ) ──")
     (line (pr-str (report/render-profile db "co-100" [:id :legal-name :jurisdiction :status])))
