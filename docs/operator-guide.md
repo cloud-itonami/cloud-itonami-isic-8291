@@ -29,6 +29,13 @@ adapter, and every fact must carry a real, verifiable source citation.
 
 - replace demo data with real, source-cited registry/sanctions feeds (extend
   `dossier.facts/catalog` honestly — never fabricate a source entry)
+- for GBR: get a free Companies House API key
+  (https://developer.company-information.service.gov.uk/) and set
+  `COMPANIES_HOUSE_API_KEY`; build the actor with `dossier.live-store/
+  live-store` instead of a bare `MemStore`/`DatomicStore`. Smoke-test
+  against the real API before relying on it — this pass shipped with a
+  fully offline-tested integration (a fake fetch-fn), not a verified live
+  call (no key was available at build time)
 - configure Datomic Local, kotoba-server or an equivalent durable SSoT
 - configure the LLM adapter through environment variables or secret manager
 - define customer contract tenants/tiers and RBAC rules

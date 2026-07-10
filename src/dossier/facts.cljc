@@ -21,7 +21,16 @@
     :name "Companies House (officers / persons with significant control)"
     :jurisdiction :gbr :class :official-registry
     :covers #{:company-registry :officers-psc} :access :public-api
-    :url "https://find-and-update.company-information.service.gov.uk"}
+    :url "https://find-and-update.company-information.service.gov.uk"
+    ;; ADR-2607110400 addendum 5: the only entry with a REAL live client
+    ;; (dossier.companies-house + dossier.live-store), not just a citation
+    ;; target. Scoped honestly to company-by-name + officials-of a KNOWN
+    ;; company id -- a global official-by-name live lookup is NOT built
+    ;; (see dossier.companies-house's docstring). :live-capable? is a
+    ;; static fact about what code exists, not a runtime check of whether
+    ;; COMPANIES_HOUSE_API_KEY is actually set right now -- see
+    ;; `dossier.companies-house/configured?` for that.
+    :live-capable? true}
    {:id :deu-unternehmensregister
     :name "Unternehmensregister (Federal Company Register)"
     :jurisdiction :deu :class :official-registry
@@ -53,11 +62,16 @@
 (defn coverage
   "Honest, machine-checkable report of what R0 actually covers — never
   overstate ('全世界' in prose, ~6 sources in fact). Mirrors
-  `cloud-itonami-M6910`'s `formation.facts/coverage`."
+  `cloud-itonami-M6910`'s `formation.facts/coverage`. `:live-capable-
+  jurisdictions` is a STATIC fact about which sources have real client code
+  (`dossier.companies-house`) — it does not mean a key is currently
+  configured; see `dossier.companies-house/configured?` for that runtime
+  check."
   []
   {:jurisdictions (into (sorted-set) (map :jurisdiction catalog))
    :source-count (count catalog)
    :covers (into (sorted-set) (mapcat :covers catalog))
+   :live-capable-jurisdictions (into (sorted-set) (map :jurisdiction (filter :live-capable? catalog)))
    :note "R0 scope: 6 public primary sources. Extend only by appending a real, citable catalog entry."})
 
 (defn class-allowed? [source-class]

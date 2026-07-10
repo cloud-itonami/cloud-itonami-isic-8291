@@ -118,6 +118,29 @@ clojure -M:dev:run    # 5-operation demo through one OperationActor
 clojure -M:lint
 ```
 
+## Live data (UK Companies House)
+
+R0 ships one real live-data seam, not just demo fixtures: `dossier.live-
+store/live-store` decorates a `MemStore`/`DatomicStore` with a fallback to
+the real [Companies House public data API](https://developer.company-information.service.gov.uk/)
+for `company-by-name` and `officials-of` a known GBR company id — local/
+seeded data always wins when present, so this can only ADD coverage, never
+change an existing answer.
+
+```bash
+export COMPANIES_HOUSE_API_KEY=...   # get one free at the URL above
+clojure -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
+```
+
+Without the env var, `live-store` behaves exactly like the undecorated
+local store — no crash, no partial data, `dossier.companies-house/
+configured?` reports `false`. See `dossier.facts/coverage`'s `:live-
+capable-jurisdictions` (currently `#{:gbr}` only) for the honest, static
+scope — `:disclosure/screen-name` does NOT yet benefit from live data
+(officer-by-name search needs a second live API hop not yet built, see
+`dossier.companies-house`'s docstring); only company lookups and a known
+company's officer list do.
+
 ## Non-Negotiables
 
 - Do not commit real company or individual data.
