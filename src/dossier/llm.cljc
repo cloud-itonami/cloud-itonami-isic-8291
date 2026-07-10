@@ -104,7 +104,16 @@
   only in R0 (`dossier.store/official-by-name`); no fuzzy/phonetic matching.
   Result columns (`:hit?` `:capacity` `:org`) require at least
   `:tier/compliance` — `dossier.policy/tier-columns` gates this the same way
-  as `propose-disclosure`."
+  as `propose-disclosure`.
+
+  A NOT-FOUND result is high confidence, not low: 'no match against our R0
+  source catalog' is itself a definitive, actionable screening result (the
+  same way a real PEP/sanctions screening product returns a confident
+  negative), not an inference the LLM is unsure about. The catalog's
+  narrowness is a documented COVERAGE characteristic (`dossier.facts/
+  coverage`), not a per-query confidence hedge — conflating the two would
+  make every screen of someone genuinely outside R0's scope escalate for
+  human review, defeating the point of an automatable screening op."
   [db {:keys [name]}]
   (let [off (store/official-by-name db name)
         hit? (boolean (and off (or (= :government-official (:capacity off))
@@ -112,14 +121,14 @@
     {:summary   (str "名前スクリーニング: " name)
      :rationale (if off
                   "登録済み official レコードとの完全一致。capacity/所属法人の flags を照合。"
-                  "登録済み official レコードに完全一致なし(未収載 ≠ クリア)。")
+                  "R0出典カタログ内に完全一致なし(範囲内での確定的な非該当。カバレッジの狭さは facts/coverage 側の特性であり、この判定自体の確信度を下げる理由ではない)。")
      :cites     [:official-by-name]
      :source    nil
      :effect    :disclosure-serve
      :columns   [:hit? :capacity :org]
      :value     {:found? (boolean off) :hit? hit? :capacity (:capacity off) :org (:org off)}
      :stake     (when hit? :sanctions-flag)
-     :confidence (if off 0.9 0.5)}))
+     :confidence (if off 0.9 0.85)}))
 
 (defn- propose-correction
   "Correction/dispute resolution draft. The LLM may draft a proposed

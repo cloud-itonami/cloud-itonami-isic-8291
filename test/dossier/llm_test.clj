@@ -60,12 +60,17 @@
     (is (false? (get-in p [:value :hit?])))
     (is (nil? (:stake p)))))
 
-(deftest name-screen-unknown-name-is-not-found-and-low-confidence
-  (testing "unmatched != cleared -- an unscreened name must not look like a clean hit"
+(deftest name-screen-unknown-name-is-not-found-but-high-confidence
+  (testing "not-found is a definitive, actionable negative screening result against R0's
+            catalog -- confidence reflects certainty in THAT match, not the catalog's
+            coverage breadth (which is documented separately via facts/coverage). A low
+            confidence here would make every screen of someone outside R0's narrow scope
+            escalate for human review, defeating the point of an automatable screening op."
     (let [db (store/seed-db)
           p (llm/infer db {:op :disclosure/screen-name :subject "tenant-acme" :name "誰でもない人(デモ)"})]
       (is (false? (get-in p [:value :found?])))
-      (is (< (:confidence p) 0.6)))))
+      (is (false? (get-in p [:value :hit?])))
+      (is (>= (:confidence p) 0.6)))))
 
 (deftest correction-proposal-never-marks-high-confidence
   (let [db (store/seed-db)
