@@ -133,6 +133,23 @@
       (is (true? (get-in p [:value :related?])))
       (is (= :business-contact (get-in p [:value :kind]))))))
 
+(deftest relationship-check-target-name-resolves-to-company
+  (testing ":target-name is for a caller who doesn't know whether its counterparty is a company
+            or a person (e.g. cloud-itonami-isic-6621/6622's generic party records) -- it tries
+            company-by-name first"
+    (let [db (store/seed-db)
+          p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                           :person-name "Jane Smith (demo)" :target-name "Northwind Capital Holdings Ltd (demo)"})]
+      (is (true? (get-in p [:value :related?])))
+      (is (= :org-membership (get-in p [:value :kind]))))))
+
+(deftest relationship-check-target-name-falls-back-to-person
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"
+                         :person-name "Jane Smith (demo)" :target-name "山田 一郎(デモ)"})]
+    (is (true? (get-in p [:value :related?])))
+    (is (= :business-contact (get-in p [:value :kind])))))
+
 (deftest relationship-check-unrelated-person-to-person-is-clean
   (let [db (store/seed-db)
         p (llm/infer db {:op :disclosure/relationship-check :subject "tenant-graph"

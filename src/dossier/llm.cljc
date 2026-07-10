@@ -170,26 +170,35 @@
   exact-match via `official-by-name`) have a professional-capacity
   relationship with a target — a company (`:company-id`/`:company-name`,
   matched by serving as an official AT that entity or a direct edge) OR
-  ANOTHER named person (`:target-person-name`, e.g. adjuster-vs-claimant or
-  broker-vs-client conflict-of-interest checks, matched by a direct edge
+  ANOTHER named person (`:target-person-name`, matched by a direct edge
   between the two officials — `relationships-of` is entity-kind-agnostic,
   so this is the same edge lookup, just resolving the target id via
-  `official-by-name` instead of `company`/`company-by-name`). One hop only
-  (R0 does not walk multi-hop chains, and does not infer a relationship
-  from a shared employer/owner alone). Result columns (`:related?` `:kind`)
-  require `:tier/graph`."
-  [db {:keys [person-name company-id company-name target-person-name]}]
+  `official-by-name` instead of `company`/`company-by-name`).
+
+  A caller that does not itself know whether its counterparty is a company
+  or a person (e.g. cloud-itonami-isic-6621/6622's `party` records store
+  both insurers/customers AND individual adjusters/brokers/claimants under
+  the same generic shape) may instead pass `:target-name` alone: it tries
+  `company-by-name` first, then `official-by-name` — the caller does not
+  have to guess or make two round-trip calls.
+
+  One hop only (R0 does not walk multi-hop chains, and does not infer a
+  relationship from a shared employer/owner alone). Result columns
+  (`:related?` `:kind`) require `:tier/graph`."
+  [db {:keys [person-name company-id company-name target-person-name target-name]}]
   (let [p (store/official-by-name db person-name)
         target (or (and company-id (store/company db company-id))
                    (and company-name (store/company-by-name db company-name))
-                   (and target-person-name (store/official-by-name db target-person-name)))
+                   (and target-person-name (store/official-by-name db target-person-name))
+                   (and target-name (or (store/company-by-name db target-name)
+                                        (store/official-by-name db target-name))))
         cid (:id target)
         org-match? (and p cid (= cid (:org p)))
         edge (when (and p cid)
                (some #(when (or (= cid (:to %)) (= cid (:from %))) %)
                      (store/relationships-of db (:id p))))
         related? (boolean (or org-match? edge))]
-    {:summary   (str "関係性照会: " person-name " × " (or company-id company-name target-person-name))
+    {:summary   (str "関係性照会: " person-name " × " (or company-id company-name target-person-name target-name))
      :rationale (cond
                   (nil? p) "対象人物が見つかりません(未収載)。"
                   (nil? target) "対象(法人または人物)が見つかりません(未収載)。"
