@@ -8,7 +8,7 @@ operator can fork, deploy, run, improve and sell.
 
 A **Palantir-style** actor design: hold curated corporate/compliance data
 internally, disclose it only to contracted, licensed users. Built on this
-workspace's [`langgraph-clj`](https://github.com/com-junkawasaki/langgraph-clj)
+workspace's [`langgraph`](https://github.com/kotoba-lang/langgraph)
 StateGraph runtime (portable `.cljc`, supervised superstep loop, interrupts,
 Datomic/in-mem checkpoints) — the same actor pattern as
 [`cloud-itonami-6310`](https://github.com/gftdcojp/cloud-itonami-6310) and
