@@ -36,6 +36,21 @@
         p (llm/infer db {:op :disclosure/query :subject "co-200" :company-id "co-200"})]
     (is (= :sanctions-flag (:stake p)))))
 
+(deftest disclosure-proposal-resolves-by-company-name
+  (testing "a caller with only a name on hand (e.g. a correspondent bank's member-name, a
+            brokerage account's :client) doesn't need the 8291 id"
+    (let [db (store/seed-db)
+          p (llm/infer db {:op :disclosure/query :subject "co-200"
+                           :company-name "Northwind Capital Holdings Ltd (demo)"})]
+      (is (= "co-200" (get-in p [:value :company-id])))
+      (is (= :sanctions-flag (:stake p))))))
+
+(deftest disclosure-proposal-value-carries-resolved-flags
+  (let [db (store/seed-db)
+        p (llm/infer db {:op :disclosure/query :subject "co-100" :company-id "co-100"})]
+    (is (= "co-100" (get-in p [:value :company-id])))
+    (is (= {} (get-in p [:value :flags])))))
+
 (deftest disclosure-proposal-greedy-adds-extra-columns
   (let [db (store/seed-db)
         clean (llm/infer db {:op :disclosure/query :subject "co-100" :company-id "co-100"})

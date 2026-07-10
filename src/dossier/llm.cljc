@@ -80,20 +80,28 @@
      :confidence (if bias? 0.9 0.85)}))
 
 (defn- propose-disclosure
-  "Disclosure column-set proposal for a licensed query. `:greedy?` injects
-  over-disclosure (pulls relationship/officials/flags columns beyond a
-  basic-tier contract) — the DisclosureGovernor's licensed-disclosure gate
-  must reject the excess columns."
-  [db {:keys [company-id greedy?]}]
-  (let [c (store/company db company-id)
+  "Disclosure column-set proposal for a licensed query. Resolves by
+  `:company-id` or, since a consumer may only have a company's NAME on
+  hand (e.g. a correspondent bank's `member-name`, a brokerage account's
+  `:client`, an audit engagement's client company name), `:company-name`
+  via `dossier.store/company-by-name` — the same resolution pattern
+  `propose-ownership-chain`/`propose-relationship-check` already use.
+  `:greedy?` injects over-disclosure (pulls relationship/officials/flags
+  columns beyond a basic-tier contract) — the DisclosureGovernor's
+  licensed-disclosure gate must reject the excess columns."
+  [db {:keys [company-id company-name greedy?]}]
+  (let [c (or (and company-id (store/company db company-id))
+              (and company-name (store/company-by-name db company-name)))
+        cid (:id c)
         base [:id :legal-name :jurisdiction :registration-no :status]
         greedy-extra [:officials :relationships :flags]]
-    {:summary   (str "開示列提案: " company-id)
+    {:summary   (str "開示列提案: " (or company-id company-name))
      :rationale (if greedy? "分析に有用そうな列を広めに含めた。" "契約 tier に必要な最小列のみ。")
      :cites     base
      :source    nil
      :effect    :disclosure-serve
      :columns   (if greedy? (into base greedy-extra) base)
+     :value     {:company-id cid :flags (or (:flags c) {})}
      :stake     (when (get-in c [:flags :sanctions?]) :sanctions-flag)
      :confidence 0.9}))
 
