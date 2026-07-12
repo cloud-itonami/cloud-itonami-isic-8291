@@ -122,7 +122,21 @@
     :name "KVK Handelsregister (Netherlands Chamber of Commerce)"
     :jurisdiction :nld :class :official-registry
     :covers #{:company-registry :officers-psc} :access :public-api
-    :url "https://www.kvk.nl"}])
+    :url "https://www.kvk.nl"}
+   ;; ---- Final R0 slot (2026-07-13): the <= 20 curation guard is now
+   ;; FULL. This slot's case: the UN Security Council Consolidated List
+   ;; is the canonical global sanctions basis -- the EU consolidated
+   ;; list and OFAC SDN entries above are regional/national
+   ;; implementations layered on top of it. :jurisdiction :un attaches
+   ;; to no single country (honest -- it is supranational), so it
+   ;; strengthens the source-basis catalog itself rather than any
+   ;; per-country coverage count. Growing past 20 requires renegotiating
+   ;; the guard in facts-test with an argued case, not an edit.
+   {:id :un-sc-consolidated-list
+    :name "UN Security Council Consolidated List"
+    :jurisdiction :un :class :government-sanctions-list
+    :covers #{:sanctions-pep} :access :public-website
+    :url "https://main.un.org/securitycouncil/en/content/un-sc-consolidated-list"}])
 
 (def allowed-source-classes
   "The set of `:source :class` values the DisclosureGovernor's source-basis
