@@ -50,7 +50,50 @@
     :name "EU Consolidated Financial Sanctions List"
     :jurisdiction :eu :class :government-sanctions-list
     :covers #{:sanctions-pep} :access :public-website
-    :url "https://webgate.ec.europa.eu/fsd"}])
+    :url "https://webgate.ec.europa.eu/fsd"}
+   ;; ---- R1 expansion (2026-07-12): eight more primary sources, same
+   ;; discipline (real, public, official). Existing :class set only —
+   ;; no new source classes are introduced.
+   {:id :fra-rne-inpi
+    :name "Registre national des entreprises (INPI)"
+    :jurisdiction :fra :class :official-registry
+    :covers #{:company-registry} :access :public-api
+    :url "https://data.inpi.fr"}
+   {:id :chn-gsxt
+    :name "国家企业信用信息公示系统 (National Enterprise Credit Information Publicity System)"
+    :jurisdiction :chn :class :official-registry
+    :covers #{:company-registry} :access :public-website
+    :url "https://www.gsxt.gov.cn"}
+   {:id :ind-mca
+    :name "Ministry of Corporate Affairs — MCA company master data"
+    :jurisdiction :ind :class :official-registry
+    :covers #{:company-registry :officers-psc} :access :public-website
+    :url "https://www.mca.gov.in"}
+   {:id :kor-dart
+    :name "DART 전자공시시스템 (FSS electronic disclosure system)"
+    :jurisdiction :kor :class :regulatory-filing
+    :covers #{:company-registry :officers-psc} :access :public-api
+    :url "https://dart.fss.or.kr"}
+   {:id :aus-abn-lookup
+    :name "ABN Lookup (Australian Business Register)"
+    :jurisdiction :aus :class :official-registry
+    :covers #{:company-registry} :access :public-api
+    :url "https://abr.business.gov.au"}
+   {:id :can-corporations-canada
+    :name "Corporations Canada federal corporation database"
+    :jurisdiction :can :class :official-registry
+    :covers #{:company-registry :officers-psc} :access :public-website
+    :url "https://ised-isde.canada.ca/site/corporations-canada/en"}
+   {:id :bra-cnpj
+    :name "Receita Federal — Consulta CNPJ (cadastro nacional, open data)"
+    :jurisdiction :bra :class :official-registry
+    :covers #{:company-registry} :access :public-api
+    :url "https://www.gov.br/receitafederal/"}
+   {:id :usa-ofac-sdn
+    :name "OFAC Specially Designated Nationals (SDN) List"
+    :jurisdiction :usa :class :government-sanctions-list
+    :covers #{:sanctions-pep} :access :public-website
+    :url "https://sanctionslist.ofac.treas.gov"}])
 
 (def allowed-source-classes
   "The set of `:source :class` values the DisclosureGovernor's source-basis
