@@ -93,7 +93,36 @@
     :name "OFAC Specially Designated Nationals (SDN) List"
     :jurisdiction :usa :class :government-sanctions-list
     :covers #{:sanctions-pep} :access :public-website
-    :url "https://sanctionslist.ofac.treas.gov"}])
+    :url "https://sanctionslist.ofac.treas.gov"}
+   ;; ---- R2 expansion (2026-07-13): five more primary sources, same
+   ;; discipline. Catalog 14 -> 19: one slot deliberately left under the
+   ;; facts-test <= 20 curation guard — the next add must argue its case,
+   ;; not slide in.
+   {:id :idn-ahu
+    :name "Direktorat Jenderal AHU — company registry search"
+    :jurisdiction :idn :class :official-registry
+    :covers #{:company-registry} :access :public-website
+    :url "https://ahu.go.id"}
+   {:id :tur-ticaret-sicili-gazetesi
+    :name "Türkiye Ticaret Sicili Gazetesi (Trade Registry Gazette)"
+    :jurisdiction :tur :class :official-registry
+    :covers #{:company-registry :officers-psc} :access :public-website
+    :url "https://www.ticaretsicil.gov.tr"}
+   {:id :sau-commercial-register
+    :name "Saudi Ministry of Commerce — commercial register search"
+    :jurisdiction :sau :class :official-registry
+    :covers #{:company-registry} :access :public-website
+    :url "https://mc.gov.sa"}
+   {:id :ita-registro-imprese
+    :name "Registro Imprese (Italian Business Register, InfoCamere)"
+    :jurisdiction :ita :class :official-registry
+    :covers #{:company-registry :officers-psc} :access :public-website
+    :url "https://www.registroimprese.it"}
+   {:id :nld-kvk-handelsregister
+    :name "KVK Handelsregister (Netherlands Chamber of Commerce)"
+    :jurisdiction :nld :class :official-registry
+    :covers #{:company-registry :officers-psc} :access :public-api
+    :url "https://www.kvk.nl"}])
 
 (def allowed-source-classes
   "The set of `:source :class` values the DisclosureGovernor's source-basis
