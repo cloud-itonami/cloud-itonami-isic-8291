@@ -8,9 +8,11 @@ name: ci
 #
 # This project is a standalone open-business blueprint (not west-registered,
 # per ADR-2607031500/2607110400). Its deps reference sibling repos via
-# :local/root (../../com-junkawasaki/langgraph-clj, .../langchain-clj). Those
-# two are PUBLIC, so the test job reconstructs the workspace layout by
-# checking them out into the expected relative paths — no token needed.
+# :local/root (../../kotoba-lang/langgraph, .../langchain — renamed from the
+# pre-rename com-junkawasaki/langgraph-clj / langchain-clj naming, deps.edn
+# commit 912b3b1). Those two are PUBLIC, so the test job reconstructs the
+# workspace layout by checking them out into the expected relative paths —
+# no token needed.
 
 on:
   push:
@@ -33,17 +35,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # lay the west workspace out so ../../com-junkawasaki/* resolves
+      # lay the west workspace out so ../../kotoba-lang/* resolves
       - uses: actions/checkout@v4
         with: { path: orgs/cloud-itonami/cloud-itonami-isic-8291 }
       - uses: actions/checkout@v4
         with:
-          repository: com-junkawasaki/langgraph-clj
-          path: orgs/com-junkawasaki/langgraph-clj
+          repository: kotoba-lang/langgraph
+          path: orgs/kotoba-lang/langgraph
       - uses: actions/checkout@v4
         with:
-          repository: com-junkawasaki/langchain-clj
-          path: orgs/com-junkawasaki/langchain-clj
+          repository: kotoba-lang/langchain
+          path: orgs/kotoba-lang/langchain
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "21" }
       - uses: DeLaGuardo/setup-clojure@13.0
