@@ -118,28 +118,35 @@ clojure -M:dev:run    # 5-operation demo through one OperationActor
 clojure -M:lint
 ```
 
-## Live data (UK Companies House)
+## Live data (GLEIF LEI + UK Companies House)
 
-R0 ships one real live-data seam, not just demo fixtures: `dossier.live-
-store/live-store` decorates a `MemStore`/`DatomicStore` with a fallback to
-the real [Companies House public data API](https://developer.company-information.service.gov.uk/)
-for `company-by-name` and `officials-of` a known GBR company id — local/
-seeded data always wins when present, so this can only ADD coverage, never
-change an existing answer.
+R0 ships two real live-data seams, not just demo fixtures: `dossier.live-
+store/live-store` decorates a `MemStore`/`DatomicStore` with fallbacks to
+the real [GLEIF LEI Registry API](https://www.gleif.org) (`dossier.gleif`)
+and the real [Companies House public data API](https://developer.company-information.service.gov.uk/)
+(`dossier.companies-house`) — local/seeded data always wins when present,
+so this can only ADD coverage, never change an existing answer.
 
 ```bash
+# GLEIF needs no API key at all — this line alone already chains the live
+# GLEIF fallback (2.7M+ legal entities worldwide, ISO 17442):
+clojure -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
+
+# add the Companies House fallback too by also setting its free key:
 export COMPANIES_HOUSE_API_KEY=...   # get one free at the URL above
 clojure -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
 ```
 
-Without the env var, `live-store` behaves exactly like the undecorated
-local store — no crash, no partial data, `dossier.companies-house/
+Without `COMPANIES_HOUSE_API_KEY`, the CH fallback is simply absent (GLEIF
+still works) — no crash, no partial data, `dossier.companies-house/
 configured?` reports `false`. See `dossier.facts/coverage`'s `:live-
-capable-jurisdictions` (currently `#{:gbr}` only) for the honest, static
-scope — `:disclosure/screen-name` does NOT yet benefit from live data
-(officer-by-name search needs a second live API hop not yet built, see
-`dossier.companies-house`'s docstring); only company lookups and a known
-company's officer list do.
+capable-jurisdictions` (currently `#{:gbr :un}` — `:un` because GLEIF is a
+supranational registry, not a national one) for the honest, static scope.
+`:disclosure/screen-name` does NOT yet benefit from either live source for
+officer/PEP name search (GLEIF has no officer data at all; Companies
+House's officer-by-name search needs a second live API hop not yet built,
+see `dossier.companies-house`'s docstring); only company lookups and a
+known GBR company's officer list do.
 
 ## Non-Negotiables
 

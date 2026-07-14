@@ -208,3 +208,42 @@ local(Mem/Datomic)Store を包み、`company`/`company-by-name`/
   検証されていない**(構築時点で実キーが無かったため)——operator は
   本番投入前に必ず自分のキーで疎通確認すること(`docs/operator-guide.md`
   参照)。
+
+## 12. 実データソース: GLEIF LEI Registry(第2のライブ経路、2026-07-14)
+
+`dossier.gleif`(`.clj`、`dossier.companies-house` と同型の host-fn 注入)が
+このアクター2つ目の**実**ライブデータ経路。GLEIF(LEI発行元自身)の公開
+`/lei-records` API は**APIキー不要**(`configured?` は常に true)、全世界
+2.7M+法人をカバーするが、深さは名前/住所/ステータス/法人形態のみ——役員/
+UBOデータは一切無い(`officials-of` は GLEIF からは絶対にライブ取得しない)。
+
+`dossier.live-store/LiveLeiStore` が同じ `Store` デコレータパターンで
+`company`/`company-by-name` の2メソッドだけを拡張する。`LiveGbrStore` の
+コードは一切変更していない——2つのデコレータは独立した record 型で、
+`live-store` 関数が `local -> LiveLeiStore -> LiveGbrStore` の順に chain
+する(local が常に勝つのは変わらず、GLEIF/CH のどちらが先に fallback を
+試すかは恣意的な設計判断)。
+
+- 認証不要。`live-store`(0引数/1引数)は既定で GLEIF fallback を含む——
+  `COMPANIES_HOUSE_API_KEY` の有無に関わらず、GLEIF は常にライブ。
+- `company-by-name` の実装で重要な発見(2026-07-14、本番APIへの実
+  `curl` で確認): GLEIF自身の `filter[entity.legalName]` は**完全一致
+  ではなくfull-text検索**(例: "Barclays Bank" で問い合わせても別法人の
+  "BARCLAYS BANK SA" がヒットする)。そのため `dossier.gleif/find-lei-by-
+  name` が `dossier.companies-house/find-company-by-name` と同じ
+  「クライアント側で大文字小文字無視の完全一致のみ採用、それ以外は
+  nil」という規律を再適用している——GLEIF側のfull-text結果をそのまま
+  答えとして採用することは絶対にしない。
+- `:jurisdiction` は `entity.legalAddress.country`(ISO 3166-1 alpha-2)を
+  本リポジトリのalpha-3 lowercase keywordへ変換して求める。変換表は
+  `dossier.gleif` 内の小さな static map(kotoba-lang/iso3166 registry は
+  alpha-3のみでalpha-2索引が無いことを事前に確認済み)——未対応の国コード
+  は `nil`(捏造しない)に degrade する。
+- `:lei` は company shape の新規一級属性(`dossier.store` の
+  `company->tx`/`pull->company`/`company-pull` に追加、`MemStore` は
+  schemaless なので変更不要)。`:registration-no` とは別概念——後者は
+  GLEIF の `registeredAs`(元の国内登記番号、供給されていれば)。
+- 実 API に対して**検証済み**(Companies House とは異なり、GLEIFは
+  APIキー不要なのでビルド時点で実疎通確認できた): Apple Inc. の実LEI
+  `HWUPKR0MPOU8FGXBT394` を `dossier.gleif/lei-record` +`->company`で
+  取得し、正しくマップされることを確認(`docs/operator-guide.md` 参照)。

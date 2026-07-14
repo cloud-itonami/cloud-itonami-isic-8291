@@ -57,8 +57,16 @@
   governor gate — it is not a claim about any real entity."
   []
   {:companies
-   {"co-100" {:id "co-100" :legal-name "出島貿易株式会社(デモ)" :jurisdiction :jpn
+   {;; :lei is a demo Legal Entity Identifier (dossier.gleif's live-data
+    ;; seam, ADR pending) -- "DEMO" embedded in the value makes it
+    ;; unmistakably not a real GLEIF-issued LEI (a real LEI is 20 opaque
+    ;; alphanumeric characters with an ISO 17442 check-digit suffix,
+    ;; never a readable word). Companies can carry both a national
+    ;; registry number AND an LEI -- they identify the same legal entity
+    ;; to two different registries, not competing identifiers.
+    "co-100" {:id "co-100" :legal-name "出島貿易株式会社(デモ)" :jurisdiction :jpn
               :registration-no "JPDEMO0001" :status :active
+              :lei "969500DEMO0JPN00001A"
               :source {:class :official-registry :ref "houjin-bangou:demo"}
               :flags {}}
     "co-200" {:id "co-200" :legal-name "Northwind Capital Holdings Ltd (demo)"
@@ -172,13 +180,14 @@
 (defn- enc [v] (pr-str v))
 (defn- dec* [s] (when s (edn/read-string s)))
 
-(defn- company->tx [{:keys [id legal-name jurisdiction registration-no status source flags]}]
+(defn- company->tx [{:keys [id legal-name jurisdiction registration-no status source flags lei]}]
   (cond-> {:company/id id}
     legal-name       (assoc :company/legal-name legal-name)
     jurisdiction     (assoc :company/jurisdiction jurisdiction)
     registration-no  (assoc :company/registration-no registration-no)
     status           (assoc :company/status status)
     source           (assoc :company/source (enc source))
+    lei              (assoc :company/lei lei)
     true             (assoc :company/flags (enc (or flags {})))))
 
 (defn- pull->company [m]
@@ -186,11 +195,12 @@
     {:id (:company/id m) :legal-name (:company/legal-name m)
      :jurisdiction (:company/jurisdiction m) :registration-no (:company/registration-no m)
      :status (:company/status m) :source (dec* (:company/source m))
+     :lei (:company/lei m)
      :flags (or (dec* (:company/flags m)) {})}))
 
 (def ^:private company-pull
   [:company/id :company/legal-name :company/jurisdiction :company/registration-no
-   :company/status :company/source :company/flags])
+   :company/status :company/source :company/flags :company/lei])
 
 (defn- official->tx [{:keys [id name title org capacity source]}]
   (cond-> {:official/id id}

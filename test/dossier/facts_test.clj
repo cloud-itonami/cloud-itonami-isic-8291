@@ -31,14 +31,19 @@
   (let [c (facts/coverage)]
     ;; the catalog is a handful of real sources, not "全世界" — this test
     ;; fails loudly if someone pads the catalog with unverifiable entries.
+    ;; Guard renegotiated 20 -> 21 (2026-07-14) for ONE argued addition,
+    ;; :global-gleif-lei (dossier.gleif) — a real, citable, live-capable
+    ;; supranational registry, not a bulk pad; see the catalog entry's own
+    ;; comment for the case. The next add past 21 must argue its case too.
     (is (= (count facts/catalog) (:source-count c)))
-    (is (<= (:source-count c) 20) "R0 catalog should stay small and citable, not bulk-padded")
+    (is (<= (:source-count c) 21) "R0 catalog should stay small and citable, not bulk-padded")
     (is (contains? (:jurisdictions c) :jpn))
     (is (contains? (:covers c) :sanctions-pep))))
 
 (deftest live-capable-jurisdictions-is-a-static-code-fact-not-a-runtime-key-check
-  (testing "ADR-2607110400 addendum 5: only GBR has a real live client (dossier.companies-house) so far"
+  (testing "ADR-2607110400 addendum 5 + GLEIF addendum: GBR (Companies House) and UN
+           (GLEIF, supranational) have real live clients so far"
     (let [c (facts/coverage)]
-      (is (= #{:gbr} (:live-capable-jurisdictions c)))
+      (is (= #{:gbr :un} (:live-capable-jurisdictions c)))
       (is (not (contains? (:live-capable-jurisdictions c) :jpn))
           "no live client exists for JPN yet, even though it's in the R0 catalog"))))
