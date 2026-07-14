@@ -29,13 +29,27 @@ adapter, and every fact must carry a real, verifiable source citation.
 
 - replace demo data with real, source-cited registry/sanctions feeds (extend
   `dossier.facts/catalog` honestly — never fabricate a source entry)
+- for global LEI coverage: nothing to configure. `dossier.live-store/
+  live-store` (0-arg or 1-arg) chains a live GLEIF LEI Registry fallback
+  (`dossier.gleif`) by default — GLEIF's public `/lei-records` API needs no
+  API key at all, so this live source is on the moment you build the actor
+  with `(live/live-store)` instead of a bare `MemStore`/`DatomicStore`.
+  Verified against the real production API 2026-07-14 (`clojure -M:dev -e
+  "(require '[dossier.gleif :as g]) (println (g/->company (g/lei-record
+  (g/live-http-fn) \"HWUPKR0MPOU8FGXBT394\")))"` — Apple Inc.'s real LEI —
+  returned a correctly-mapped company). Coverage is broad (2.7M+ entities
+  worldwide) but shallow: name/address/status/legal-form only, no
+  officers/directors/UBOs — `officials-of` is never GLEIF-sourced.
 - for GBR: get a free Companies House API key
   (https://developer.company-information.service.gov.uk/) and set
-  `COMPANIES_HOUSE_API_KEY`; build the actor with `dossier.live-store/
-  live-store` instead of a bare `MemStore`/`DatomicStore`. Smoke-test
-  against the real API before relying on it — this pass shipped with a
-  fully offline-tested integration (a fake fetch-fn), not a verified live
-  call (no key was available at build time)
+  `COMPANIES_HOUSE_API_KEY`. `dossier.live-store/live-store` picks this up
+  automatically once the env var is set (no code change needed) and chains
+  it alongside the GLEIF fallback above — local/seeded data still always
+  wins over either. Without the env var, the Companies House fallback is
+  simply absent (GLEIF still works); this pass shipped with a fully
+  offline-tested CH integration (a fake fetch-fn), not a verified live CH
+  call (no key was available at build time) — GLEIF, unlike CH, WAS
+  verified live at build time since it needs no key.
 - configure Datomic Local, kotoba-server or an equivalent durable SSoT
 - configure the LLM adapter through environment variables or secret manager
 - define customer contract tenants/tiers and RBAC rules
