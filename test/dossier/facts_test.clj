@@ -41,9 +41,10 @@
     (is (contains? (:covers c) :sanctions-pep))))
 
 (deftest live-capable-jurisdictions-is-a-static-code-fact-not-a-runtime-key-check
-  (testing "ADR-2607110400 addendum 5 + GLEIF addendum: GBR (Companies House) and UN
-           (GLEIF, supranational) have real live clients so far"
+  (testing "ADR-2607110400 addendum 5 + GLEIF addendum + SEC EDGAR addendum: GBR
+           (Companies House), UN (GLEIF, supranational) and USA (SEC EDGAR) have
+           real live clients so far"
     (let [c (facts/coverage)]
-      (is (= #{:gbr :un} (:live-capable-jurisdictions c)))
+      (is (= #{:gbr :un :usa} (:live-capable-jurisdictions c)))
       (is (not (contains? (:live-capable-jurisdictions c) :jpn))
           "no live client exists for JPN yet, even though it's in the R0 catalog"))))

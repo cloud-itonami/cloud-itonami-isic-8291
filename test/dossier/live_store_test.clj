@@ -1,8 +1,9 @@
 (ns dossier.live-store-test
   "dossier.live-store's decorator contract: local always wins when present,
-  a live Companies House and/or GLEIF fallback only fires for names/ids
-  local has nothing for, and a nil fetch-fn degrades to exactly the
-  undecorated local store — entirely offline via injected fake fetch-fns."
+  a live Companies House and/or GLEIF and/or SEC EDGAR fallback only fires
+  for names/ids local has nothing for, and a nil fetch-fn degrades to
+  exactly the undecorated local store — entirely offline via injected fake
+  fetch-fns."
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [dossier.store :as store]
@@ -146,6 +147,66 @@
     (is (nil? (store/company decorated "gbr-does-not-exist"))
         "an id with no lei- prefix is never sent to the GLEIF fetch-fn")))
 
+;; ───────────────── SEC EDGAR (LiveSecEdgarStore / sec-edgar-store) ──────
+
+(def solstice-sec-submission
+  {:cik "0000445566"
+   :entityType "operating"
+   :sic "3721"
+   :sicDescription "Aircraft"
+   :name "Solstice Aerospace Inc (demo)"
+   :tickers ["SLST"]
+   :exchanges ["Nasdaq"]
+   :stateOfIncorporation "DE"})
+
+(def solstice-sec-routes
+  {"/submissions/CIK0000445566.json"
+   (fn [_] solstice-sec-submission)})
+
+(deftest sec-edgar-store-nil-fetch-fn-behaves-exactly-like-the-undecorated-local-store
+  (let [local (store/seed-db)
+        decorated (live/sec-edgar-store local nil)]
+    (is (= (store/company local "co-100") (store/company decorated "co-100")))
+    (is (nil? (store/company decorated "usa-0000445566"))
+        "no fetch-fn -> no live fallback at all")))
+
+(deftest sec-edgar-store-local-data-always-wins-over-a-live-fallback
+  (let [local (store/seed-db)
+        suspicious-fetch (fn [_] (throw (ex-info "should never be called for a local hit" {})))
+        decorated (live/sec-edgar-store local suspicious-fetch)]
+    (is (= (store/company local "co-100") (store/company decorated "co-100")))))
+
+(deftest sec-edgar-store-live-fallback-fires-for-a-usa-namespaced-id-local-has-nothing-for
+  (let [local (store/seed-db)
+        decorated (live/sec-edgar-store local (fake-fetch solstice-sec-routes))
+        c (store/company decorated "usa-0000445566")]
+    (is (= "usa-0000445566" (:id c)))
+    (is (= "Solstice Aerospace Inc (demo)" (:legal-name c)))
+    (is (= :usa (:jurisdiction c)))
+    (is (nil? (store/company local "usa-0000445566"))
+        "sanity: genuinely absent from local, so this really did come from the live fallback")))
+
+(deftest sec-edgar-store-company-by-name-is-always-a-passthrough-no-name-search-endpoint
+  (let [local (store/seed-db)
+        decorated (live/sec-edgar-store local (fake-fetch solstice-sec-routes))]
+    (is (= (store/company-by-name local "Solstice Aerospace Inc (demo)")
+           (store/company-by-name decorated "Solstice Aerospace Inc (demo)")))
+    (is (nil? (store/company-by-name decorated "Solstice Aerospace Inc (demo)"))
+        "SEC EDGAR's submissions API has no entity-name search endpoint -- never a live lookup here")))
+
+(deftest sec-edgar-store-officials-of-is-always-a-passthrough-sec-edgar-has-no-officer-data
+  (let [local (store/seed-db)
+        decorated (live/sec-edgar-store local (fake-fetch solstice-sec-routes))]
+    (is (= (store/officials-of local "co-100") (store/officials-of decorated "co-100")))
+    (is (empty? (store/officials-of decorated "usa-0000445566"))
+        "SEC EDGAR's submissions endpoint carries no officer data at all -- never a live lookup here")))
+
+(deftest non-usa-id-never-triggers-a-sec-edgar-live-lookup
+  (let [local (store/seed-db)
+        decorated (live/sec-edgar-store local (fake-fetch solstice-sec-routes))]
+    (is (nil? (store/company decorated "gbr-does-not-exist"))
+        "an id with no usa- prefix is never sent to the SEC EDGAR fetch-fn")))
+
 ;; ─────────────── combined chain: local -> GLEIF -> Companies House ──────
 
 (deftest full-live-store-chains-both-sources-local-still-wins
@@ -167,3 +228,40 @@
           decorated (live/live-store local (fake-fetch acme-routes))]
       (is (nil? (store/company-by-name decorated "Zenith Trading Co (demo)"))
           "no lei-fetch-fn was passed, so a GLEIF-only name is not found via this arity"))))
+
+(deftest full-live-store-3-arg-arity-stays-ch-plus-gleif-only-unchanged
+  (testing "the 3-arg [local ch-fetch-fn lei-fetch-fn] arity must NOT gain a SEC EDGAR layer --
+           this is the exact shape full-live-store-chains-both-sources-local-still-wins above
+           already exercises"
+    (let [local (store/seed-db)
+          decorated (live/live-store local (fake-fetch acme-routes) (fake-fetch zenith-lei-routes))]
+      (is (nil? (store/company decorated "usa-0000445566"))
+          "no sec-fetch-fn was passed, so a SEC-EDGAR-only id is not found via this arity"))))
+
+;; ───────── combined chain (4-arg): local -> SEC EDGAR -> GLEIF -> CH ─────
+
+(deftest full-live-store-chains-all-three-sources-local-still-wins
+  (let [local (store/seed-db)
+        decorated (live/live-store local (fake-fetch acme-routes) (fake-fetch zenith-lei-routes)
+                                    (fake-fetch solstice-sec-routes))]
+    (is (= (store/company local "co-100") (store/company decorated "co-100"))
+        "local wins over all three live sources")
+    (testing "SEC EDGAR fallback fires for a usa-<cik> id only SEC EDGAR's fixture knows"
+      (is (= "Solstice Aerospace Inc (demo)" (:legal-name (store/company decorated "usa-0000445566")))))
+    (testing "GLEIF fallback fires for a name only GLEIF's fixture knows"
+      (is (= "lei-969500DEMO0ZEN00001A" (:id (store/company-by-name decorated "Zenith Trading Co (demo)")))))
+    (testing "Companies House fallback fires for a name only CH's fixture knows"
+      (is (= "gbr-GBDEMO7777" (:id (store/company-by-name decorated "Acme Registered Ltd (demo)")))))
+    (testing "a name neither live source nor local knows about is still nil"
+      (is (nil? (store/company-by-name decorated "Nobody Registered Anywhere (demo)"))))
+    (testing "an id neither live source nor local knows about is still nil"
+      (is (nil? (store/company decorated "usa-0000000000"))))))
+
+(deftest full-live-store-4-arg-arity-any-source-may-be-disabled-with-nil
+  (let [local (store/seed-db)
+        decorated (live/live-store local nil nil (fake-fetch solstice-sec-routes))]
+    (is (= "Solstice Aerospace Inc (demo)" (:legal-name (store/company decorated "usa-0000445566"))))
+    (is (nil? (store/company-by-name decorated "Acme Registered Ltd (demo)"))
+        "ch-fetch-fn is nil in this arity call, so CH is not consulted")
+    (is (nil? (store/company-by-name decorated "Zenith Trading Co (demo)"))
+        "lei-fetch-fn is nil in this arity call, so GLEIF is not consulted")))
