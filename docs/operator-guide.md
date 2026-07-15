@@ -50,6 +50,30 @@ adapter, and every fact must carry a real, verifiable source citation.
   offline-tested CH integration (a fake fetch-fn), not a verified live CH
   call (no key was available at build time) — GLEIF, unlike CH, WAS
   verified live at build time since it needs no key.
+- for USA registry/disclosure data (entity name, SIC code, addresses,
+  state of incorporation, former names, tickers, exchanges — NOT financial
+  facts like revenue/assets, which is a different actor's concern
+  entirely, see below): no key/application needed, only an honest
+  identifying string. Set `SEC_EDGAR_USER_AGENT` to a real `name email`
+  value (SEC's fair-use policy requires every request identify a caller —
+  https://www.sec.gov/os/webmaster-faq#developers — an unset/generic
+  User-Agent risks throttling). `dossier.live-store/live-store` picks this
+  up automatically once the env var is set (no code change needed) and
+  chains it alongside the Companies House/GLEIF fallbacks above —
+  local/seeded data still always wins. Without the env var, the SEC EDGAR
+  fallback is simply absent (the other two still work). Live lookups are
+  by a known `usa-<cik>` id ONLY (`store/company`) — SEC EDGAR's
+  `submissions` API has no entity-name search endpoint at all, so
+  `store/company-by-name` never resolves a SEC-EDGAR-only name. Verified
+  against the real production API 2026-07-15 (`SEC_EDGAR_USER_AGENT="dossier
+  jun784@gmail.com" clojure -M:dev -e "(require '[dossier.sec-edgar :as
+  sec]) (println (sec/->company (sec/submissions (sec/live-http-fn
+  (sec/env-user-agent)) 320193)))"` — Apple Inc.'s real CIK 320193 —
+  returned a correctly-mapped company; Microsoft's CIK 789019 verified the
+  same way). **Do not point this at the XBRL `companyfacts` endpoint** —
+  that financial-facts API is `cloud-murakumo-market-intel`'s connector,
+  a deliberately separate concern from this actor's registry/disclosure
+  scope (see `dossier.sec-edgar`'s ns docstring for the exact boundary).
 - configure Datomic Local, kotoba-server or an equivalent durable SSoT
 - configure the LLM adapter through environment variables or secret manager
 - define customer contract tenants/tiers and RBAC rules

@@ -46,7 +46,20 @@
     :name "SEC EDGAR (public company filings)"
     :jurisdiction :usa :class :regulatory-filing
     :covers #{:company-registry :officers-psc} :access :public-api
-    :url "https://www.sec.gov/edgar"}
+    :url "https://www.sec.gov/edgar"
+    ;; 2026-07-15: the THIRD entry with a REAL live client
+    ;; (dossier.sec-edgar + dossier.live-store/LiveSecEdgarStore), scoped
+    ;; honestly to the `submissions` (registry/disclosure) endpoint ONLY --
+    ;; deliberately NOT the XBRL `companyfacts` (financial-facts) endpoint,
+    ;; which is cloud-murakumo-market-intel's concern (see
+    ;; dossier.sec-edgar's docstring for the exact boundary; this same
+    ;; catalog entry was scoped out of a live-client pass earlier,
+    ;; ADR-2607150100, specifically to avoid that mix-up while that repo
+    ;; stood up its own EDGAR connector). Company-by-name is NOT live here
+    ;; -- SEC EDGAR's submissions API has no entity-name search endpoint at
+    ;; all, only a known usa-<cik> id lookup (see
+    ;; dossier.sec-edgar/->company + dossier.live-store/LiveSecEdgarStore).
+    :live-capable? true}
    {:id :eu-sanctions-list
     :name "EU Consolidated Financial Sanctions List"
     :jurisdiction :eu :class :government-sanctions-list
