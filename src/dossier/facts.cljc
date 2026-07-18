@@ -16,7 +16,18 @@
     :name "法人番号公表サイト (National Tax Agency Corporate Number Publication Site)"
     :jurisdiction :jpn :class :official-registry
     :covers #{:company-registry} :access :public-api
-    :url "https://www.houjin-bangou.nta.go.jp"}
+    :url "https://www.houjin-bangou.nta.go.jp"
+    ;; ADR-2607182200: a REAL live client now exists (dossier.houjin-bangou
+    ;; + dossier.live-store's LiveJpnStore) — request/response shapes built
+    ;; from the real public API spec, offline-tested against realistic
+    ;; fixture XML. :live-capable? is a static fact about what code exists
+    ;; (same convention :gbr-companies-house's entry documents below), NOT
+    ;; a runtime check of whether HOUJIN_BANGOU_APPLICATION_ID is actually
+    ;; set. UNLIKE Companies House/GLEIF, this source needs a National Tax
+    ;; Agency Application ID obtained through a ~2-4 week manual
+    ;; registration (not same-day self-serve) — not yet live-verified with
+    ;; a real key as of this ADR; see dossier.houjin-bangou's ns docstring.
+    :live-capable? true}
    {:id :gbr-companies-house
     :name "Companies House (officers / persons with significant control)"
     :jurisdiction :gbr :class :official-registry

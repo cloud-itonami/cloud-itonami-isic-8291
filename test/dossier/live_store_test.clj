@@ -207,6 +207,61 @@
     (is (nil? (store/company decorated "gbr-does-not-exist"))
         "an id with no usa- prefix is never sent to the SEC EDGAR fetch-fn")))
 
+;; ───────────── houjin-bangou (LiveJpnStore / jpn-store) ─────────────────
+
+(def yamato-jpn-corp
+  {:corporateNumber "5050005005266" :name "大和職業紹介株式会社(demo)"
+   :prefectureName "東京都" :cityName "千代田区" :streetNumber "丸の内一丁目1番1号"
+   :kind "301" :closeDate "" :closeCause "" :latest "1"})
+
+(def yamato-jpn-routes
+  {"/4/name"
+   (fn [{:strs [name]}] (when (= name "大和職業紹介株式会社(demo)") [yamato-jpn-corp]))
+   "/4/num"
+   (fn [{:strs [number]}] (when (= number "5050005005266") [yamato-jpn-corp]))})
+
+(deftest jpn-store-nil-fetch-fn-behaves-exactly-like-the-undecorated-local-store
+  (let [local (store/seed-db)
+        decorated (live/jpn-store local nil)]
+    (is (= (store/company local "co-100") (store/company decorated "co-100")))
+    (is (nil? (store/company decorated "jpn-5050005005266"))
+        "no fetch-fn -> no live fallback at all")))
+
+(deftest jpn-store-local-data-always-wins-over-a-live-fallback
+  (let [local (store/seed-db)
+        suspicious-fetch (fn [_] (throw (ex-info "should never be called for a local hit" {})))
+        decorated (live/jpn-store local suspicious-fetch)]
+    (is (= (store/company local "co-100") (store/company decorated "co-100")))))
+
+(deftest jpn-store-live-fallback-fires-for-a-jpn-namespaced-id-local-has-nothing-for
+  (let [local (store/seed-db)
+        decorated (live/jpn-store local (fake-fetch yamato-jpn-routes))
+        c (store/company decorated "jpn-5050005005266")]
+    (is (= "jpn-5050005005266" (:id c)))
+    (is (= "大和職業紹介株式会社(demo)" (:legal-name c)))
+    (is (= :jpn (:jurisdiction c)))
+    (is (nil? (store/company local "jpn-5050005005266"))
+        "sanity: genuinely absent from local, so this really did come from the live fallback")))
+
+(deftest jpn-store-company-by-name-live-fallback-fires-for-a-name-local-has-nothing-for
+  (let [local (store/seed-db)
+        decorated (live/jpn-store local (fake-fetch yamato-jpn-routes))]
+    (is (= "jpn-5050005005266" (:id (store/company-by-name decorated "大和職業紹介株式会社(demo)"))))
+    (is (nil? (store/company-by-name local "大和職業紹介株式会社(demo)")))))
+
+(deftest jpn-store-officials-of-is-always-a-passthrough-houjin-bangou-has-no-officer-data
+  (let [local (store/seed-db)
+        decorated (live/jpn-store local (fake-fetch yamato-jpn-routes))]
+    (is (= (store/officials-of local "co-100") (store/officials-of decorated "co-100")))
+    (is (empty? (store/officials-of decorated "jpn-5050005005266"))
+        "houjin-bangou carries no officer data at all -- never a live lookup here")))
+
+(deftest non-jpn-id-never-triggers-a-houjin-bangou-live-lookup
+  (let [local (store/seed-db)
+        decorated (live/jpn-store local (fake-fetch yamato-jpn-routes))]
+    (is (nil? (store/company decorated "gbr-does-not-exist"))
+        "an id with no jpn- prefix is never sent to the houjin-bangou fetch-fn")))
+
 ;; ─────────────── combined chain: local -> GLEIF -> Companies House ──────
 
 (deftest full-live-store-chains-both-sources-local-still-wins
@@ -265,3 +320,43 @@
         "ch-fetch-fn is nil in this arity call, so CH is not consulted")
     (is (nil? (store/company-by-name decorated "Zenith Trading Co (demo)"))
         "lei-fetch-fn is nil in this arity call, so GLEIF is not consulted")))
+
+(deftest full-live-store-4-arg-arity-stays-without-houjin-bangou-layer-unchanged
+  (testing "the 4-arg [local ch-fetch-fn lei-fetch-fn sec-fetch-fn] arity must NOT gain a
+           houjin-bangou layer -- this is the exact shape
+           full-live-store-chains-all-three-sources-local-still-wins above already exercises"
+    (let [local (store/seed-db)
+          decorated (live/live-store local (fake-fetch acme-routes) (fake-fetch zenith-lei-routes)
+                                      (fake-fetch solstice-sec-routes))]
+      (is (nil? (store/company decorated "jpn-5050005005266"))
+          "no jpn-fetch-fn was passed, so a houjin-bangou-only id is not found via this arity"))))
+
+;; ────── combined chain (5-arg): local -> houjin-bangou -> SEC EDGAR -> GLEIF -> CH ──────
+
+(deftest full-live-store-chains-all-four-sources-local-still-wins
+  (let [local (store/seed-db)
+        decorated (live/live-store local (fake-fetch acme-routes) (fake-fetch zenith-lei-routes)
+                                    (fake-fetch solstice-sec-routes) (fake-fetch yamato-jpn-routes))]
+    (is (= (store/company local "co-100") (store/company decorated "co-100"))
+        "local wins over all four live sources")
+    (testing "houjin-bangou fallback fires for a jpn-<number> id only its fixture knows"
+      (is (= "大和職業紹介株式会社(demo)" (:legal-name (store/company decorated "jpn-5050005005266")))))
+    (testing "SEC EDGAR fallback fires for a usa-<cik> id only SEC EDGAR's fixture knows"
+      (is (= "Solstice Aerospace Inc (demo)" (:legal-name (store/company decorated "usa-0000445566")))))
+    (testing "GLEIF fallback fires for a name only GLEIF's fixture knows"
+      (is (= "lei-969500DEMO0ZEN00001A" (:id (store/company-by-name decorated "Zenith Trading Co (demo)")))))
+    (testing "Companies House fallback fires for a name only CH's fixture knows"
+      (is (= "gbr-GBDEMO7777" (:id (store/company-by-name decorated "Acme Registered Ltd (demo)")))))
+    (testing "a name neither live source nor local knows about is still nil"
+      (is (nil? (store/company-by-name decorated "Nobody Registered Anywhere (demo)"))))
+    (testing "an id neither live source nor local knows about is still nil"
+      (is (nil? (store/company decorated "jpn-0000000000000"))))))
+
+(deftest full-live-store-5-arg-arity-any-source-may-be-disabled-with-nil
+  (let [local (store/seed-db)
+        decorated (live/live-store local nil nil nil (fake-fetch yamato-jpn-routes))]
+    (is (= "大和職業紹介株式会社(demo)" (:legal-name (store/company decorated "jpn-5050005005266"))))
+    (is (nil? (store/company decorated "usa-0000445566"))
+        "sec-fetch-fn is nil in this arity call, so SEC EDGAR is not consulted")
+    (is (nil? (store/company-by-name decorated "Acme Registered Ltd (demo)"))
+        "ch-fetch-fn is nil in this arity call, so CH is not consulted")))
