@@ -1,11 +1,13 @@
 (ns dossier.live-store
   "A `dossier.store/Store` decorator (ADR-2607110400 addendum 5, GLEIF
-  addendum, SEC EDGAR addendum) that layers real live-data sources — UK
-  Companies House (`LiveGbrStore`), GLEIF LEI (`LiveLeiStore`) and SEC
-  EDGAR (`LiveSecEdgarStore`) — on top of an underlying local store
+  addendum, SEC EDGAR addendum, ADR-2607182200 houjin-bangou addendum)
+  that layers real live-data sources — UK Companies House
+  (`LiveGbrStore`), GLEIF LEI (`LiveLeiStore`), SEC EDGAR
+  (`LiveSecEdgarStore`) and Japan's 法人番号 Corporate Number
+  (`LiveJpnStore`) — on top of an underlying local store
   (`MemStore`/`DatomicStore`). Every protocol method not explicitly
   overridden below delegates straight through to `local` — this is a thin
-  proxy, not a rewrite of the store contract. The three decorators are
+  proxy, not a rewrite of the store contract. The four decorators are
   independent record types and CHAIN (one's `local` can be another) rather
   than merge into one type, so adding a new seam never touches an existing
   decorator's own code or behavior.
@@ -36,6 +38,7 @@
             [dossier.companies-house :as ch]
             [dossier.gleif :as gleif]
             [dossier.sec-edgar :as sec]
+            [dossier.houjin-bangou :as hb]
             [clojure.string :as str]))
 
 (defn- gbr-id? [id]
@@ -43,6 +46,12 @@
 
 (defn- company-number-of [gbr-id]
   (subs gbr-id 4))
+
+(defn- jpn-id? [id]
+  (and (string? id) (str/starts-with? id "jpn-")))
+
+(defn- corporate-number-of [jpn-id]
+  (subs jpn-id 4))
 
 (defn- lei-id? [id]
   (and (string? id) (str/starts-with? id "lei-")))
@@ -147,6 +156,48 @@
   (with-relationships [_ rs] (store/with-relationships local rs))
   (with-contracts [_ cts] (store/with-contracts local cts)))
 
+(defrecord LiveJpnStore [local fetch-fn]
+  store/Store
+  (company [_ id]
+    (or (store/company local id)
+        (when (and fetch-fn (jpn-id? id))
+          (hb/->company (first (hb/by-corporate-number fetch-fn (corporate-number-of id)))))))
+  (company-by-name [_ name]
+    (or (store/company-by-name local name)
+        (when fetch-fn
+          (hb/->company (hb/find-company-by-name fetch-fn name)))))
+  (official [_ id] (store/official local id))
+  (official-by-name [_ name] (store/official-by-name local name))
+  ;; 法人番号公表サイト carries no officer/director/UBO data at all (it is a
+  ;; pure corporate-registry lookup: name, address, status) -- pure
+  ;; passthrough, never a live lookup, same honest-limitation shape as
+  ;; LiveLeiStore's / LiveSecEdgarStore's officials-of above.
+  (officials-of [_ org-id] (store/officials-of local org-id))
+  (agency [_ id] (store/agency local id))
+  (relationships-of [_ id] (store/relationships-of local id))
+  (contract [_ tenant] (store/contract local tenant))
+  (ledger [_] (store/ledger local))
+  (commit-record! [_ record] (store/commit-record! local record))
+  (append-ledger! [_ fact] (store/append-ledger! local fact))
+  (with-companies [_ cs] (store/with-companies local cs))
+  (with-officials [_ os] (store/with-officials local os))
+  (with-agencies [_ ags] (store/with-agencies local ags))
+  (with-relationships [_ rs] (store/with-relationships local rs))
+  (with-contracts [_ cts] (store/with-contracts local cts)))
+
+(defn jpn-store
+  "Wraps `local` with a live 法人番号 (Corporate Number) fallback ONLY —
+  the houjin-bangou-only analog of `live-store`'s 2-arg CH-only arity.
+  `fetch-fn` defaults to `dossier.houjin-bangou/live-http-fn` gated on
+  `HOUJIN_BANGOU_APPLICATION_ID` — nil (no fallback) when that env var is
+  unset, same gating shape as `sec-edgar-store`."
+  ([] (jpn-store (store/seed-db)))
+  ([local]
+   (jpn-store local
+              (let [key (hb/env-api-key)]
+                (when (hb/configured? key) #?(:clj (hb/live-http-fn key) :cljs nil)))))
+  ([local fetch-fn] (->LiveJpnStore local fetch-fn)))
+
 (defn lei-store
   "Wraps `local` with a live GLEIF LEI fallback ONLY — the GLEIF-only
   analog of `live-store`'s 2-arg CH-only arity, useful standalone or when
@@ -175,38 +226,48 @@
 (defn live-store
   "Wraps `local` (default: a fresh demo `store/seed-db`) with this actor's
   live-data fallbacks, chained local-first: an id/name absent from `local`
-  falls through to SEC EDGAR, then GLEIF LEI, then (if still absent) to
-  Companies House — arbitrary order among the live sources (they are
-  mutually exclusive by id prefix / endpoint capability, so order among
-  them never changes an answer), but local ALWAYS wins over any of them
-  (see ns docstring). `company`/`company-by-name` benefit from Companies
-  House and GLEIF; SEC EDGAR only ever answers `company` (a known
-  `usa-<cik>` id — it has no name-search endpoint, see `LiveSecEdgarStore`'s
-  docstring). `officials-of` only ever gets a live answer from Companies
-  House (neither GLEIF nor SEC EDGAR carries officer data).
+  falls through to houjin-bangou, then SEC EDGAR, then GLEIF LEI, then (if
+  still absent) to Companies House — arbitrary order among the live
+  sources (they are mutually exclusive by id prefix / endpoint
+  capability, so order among them never changes an answer), but local
+  ALWAYS wins over any of them (see ns docstring). `company`/`company-by-
+  name` benefit from Companies House, GLEIF and houjin-bangou; SEC EDGAR
+  only ever answers `company` (a known `usa-<cik>` id — it has no
+  name-search endpoint, see `LiveSecEdgarStore`'s docstring). `officials-
+  of` only ever gets a live answer from Companies House (GLEIF, SEC EDGAR
+  and houjin-bangou carry no officer data at all).
 
-    - 0-arg / 1-arg: convenience constructors that chain ALL THREE live
+    - 0-arg / 1-arg: convenience constructors that chain ALL FOUR live
       sources, resolving each fetch-fn from its own default:
       `dossier.companies-house/live-http-fn` gated on
       `COMPANIES_HOUSE_API_KEY` (nil, i.e. no CH fallback, when that env
       var is unset), `dossier.gleif/live-http-fn` (needs no key, so always
-      live in `:clj` unless a caller opts out via a lower arity), and
+      live in `:clj` unless a caller opts out via a lower arity),
       `dossier.sec-edgar/live-http-fn` gated on `SEC_EDGAR_USER_AGENT`
       (nil, i.e. no SEC EDGAR fallback, when that env var is unset — same
       gating shape as Companies House, see `dossier.sec-edgar`'s
-      docstring).
+      docstring), and `dossier.houjin-bangou/live-http-fn` gated on
+      `HOUJIN_BANGOU_APPLICATION_ID` (nil, i.e. no houjin-bangou fallback,
+      when that env var is unset — same gating shape, see
+      `dossier.houjin-bangou`'s docstring for why this one is NOT
+      same-day self-serve like the others).
     - `[local ch-fetch-fn]`: UNCHANGED since ADR addendum 5 — Companies-
-      House-only, no GLEIF or SEC EDGAR layer at all. This is the exact
-      2-arg shape `test/dossier/live_store_test.clj` exercises with a
-      canned CH-shaped fake and it must keep behaving identically; use
-      `lei-store`/`sec-edgar-store` for the single-source equivalents, or a
-      wider arity below for a combination.
+      House-only, no GLEIF/SEC EDGAR/houjin-bangou layer at all. This is
+      the exact 2-arg shape `test/dossier/live_store_test.clj` exercises
+      with a canned CH-shaped fake and it must keep behaving identically;
+      use `lei-store`/`sec-edgar-store`/`jpn-store` for the single-source
+      equivalents, or a wider arity below for a combination.
     - `[local ch-fetch-fn lei-fetch-fn]`: UNCHANGED since the GLEIF
-      addendum — Companies House + GLEIF only, no SEC EDGAR layer; this is
-      the exact 3-arg shape the combined-chain tests already exercise.
-    - `[local ch-fetch-fn lei-fetch-fn sec-fetch-fn]`: explicit control
-      over all three sources at once (any may be `nil` to disable that
-      source)."
+      addendum — Companies House + GLEIF only, no SEC EDGAR/houjin-bangou
+      layer; this is the exact 3-arg shape the combined-chain tests
+      already exercise.
+    - `[local ch-fetch-fn lei-fetch-fn sec-fetch-fn]`: UNCHANGED since the
+      SEC EDGAR addendum — Companies House + GLEIF + SEC EDGAR, no
+      houjin-bangou layer; this is the exact 4-arg shape the combined-
+      chain tests already exercise.
+    - `[local ch-fetch-fn lei-fetch-fn sec-fetch-fn jpn-fetch-fn]`:
+      explicit control over all four sources at once (any may be `nil` to
+      disable that source)."
   ([] (live-store (store/seed-db)))
   ([local]
    (live-store local
@@ -214,9 +275,13 @@
                  (when (ch/configured? key) #?(:clj (ch/live-http-fn key) :cljs nil)))
                #?(:clj (gleif/live-http-fn) :cljs nil)
                (let [ua (sec/env-user-agent)]
-                 (when (sec/configured? ua) #?(:clj (sec/live-http-fn ua) :cljs nil)))))
+                 (when (sec/configured? ua) #?(:clj (sec/live-http-fn ua) :cljs nil)))
+               (let [key (hb/env-api-key)]
+                 (when (hb/configured? key) #?(:clj (hb/live-http-fn key) :cljs nil)))))
   ([local ch-fetch-fn] (->LiveGbrStore local ch-fetch-fn))
   ([local ch-fetch-fn lei-fetch-fn]
    (->LiveGbrStore (->LiveLeiStore local lei-fetch-fn) ch-fetch-fn))
   ([local ch-fetch-fn lei-fetch-fn sec-fetch-fn]
-   (->LiveGbrStore (->LiveLeiStore (->LiveSecEdgarStore local sec-fetch-fn) lei-fetch-fn) ch-fetch-fn)))
+   (->LiveGbrStore (->LiveLeiStore (->LiveSecEdgarStore local sec-fetch-fn) lei-fetch-fn) ch-fetch-fn))
+  ([local ch-fetch-fn lei-fetch-fn sec-fetch-fn jpn-fetch-fn]
+   (->LiveGbrStore (->LiveLeiStore (->LiveSecEdgarStore (->LiveJpnStore local jpn-fetch-fn) sec-fetch-fn) lei-fetch-fn) ch-fetch-fn)))

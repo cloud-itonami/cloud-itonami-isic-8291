@@ -41,10 +41,13 @@
     (is (contains? (:covers c) :sanctions-pep))))
 
 (deftest live-capable-jurisdictions-is-a-static-code-fact-not-a-runtime-key-check
-  (testing "ADR-2607110400 addendum 5 + GLEIF addendum + SEC EDGAR addendum: GBR
-           (Companies House), UN (GLEIF, supranational) and USA (SEC EDGAR) have
-           real live clients so far"
+  (testing "ADR-2607110400 addendum 5 + GLEIF addendum + SEC EDGAR addendum +
+           ADR-2607182200 houjin-bangou addendum: GBR (Companies House), UN
+           (GLEIF, supranational), USA (SEC EDGAR) and JPN (houjin-bangou) have
+           real live client CODE so far — this is a static fact about what code
+           exists, not proof any of their API keys/Application IDs are actually
+           configured in a given environment (see each client's `configured?`
+           for that runtime check; houjin-bangou's in particular still has no
+           real Application ID exercised anywhere, per its own ns docstring)"
     (let [c (facts/coverage)]
-      (is (= #{:gbr :un :usa} (:live-capable-jurisdictions c)))
-      (is (not (contains? (:live-capable-jurisdictions c) :jpn))
-          "no live client exists for JPN yet, even though it's in the R0 catalog"))))
+      (is (= #{:gbr :jpn :un :usa} (:live-capable-jurisdictions c))))))
