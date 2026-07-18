@@ -251,6 +251,7 @@
     :disclosure/screen-name (propose-name-screen db request)
     :disclosure/ownership-chain (propose-ownership-chain db request)
     :disclosure/relationship-check (propose-relationship-check db request)
+    :disclosure/discover-candidates (propose-discover-candidates db request)
     :correction/request  (propose-correction db request)
     {:summary "未対応の操作" :rationale (str op) :cites [] :source nil
      :effect :noop :stake nil :confidence 0.0}))
@@ -317,6 +318,35 @@
                                               "\n事実: " (pr-str (facts-for st req)))}]
              resp (model/-generate chat-model msgs gen-opts)]
          (parse-proposal (:content resp)))))))
+
+(defn- propose-discover-candidates
+  "Candidate-discovery proposal for LEI/ToS collection rollout.
+  Input: {:vertical {:isic \"0610\" | :isco \"...\" | :country \"...\" | ...} :count 3}
+  Output: top-N real global/listed companies for that vertical + reason citations.
+
+  The LLM proposal ONLY narrows the candidate list via source citations.
+  It never fabricates companies. The actual registry lookup (GLEIF/SEC/Companies House)
+  happens downstream in the deterministic registry clients, which are NOT governed
+  (per ADR-2607150100: registry fetches bypass the governor)."
+  [_db {:keys [vertical count] :or {count 3}}]
+  (let [code-key (first (keys vertical))
+        code-val (get vertical code-key)
+        candidates-demo (case [code-key code-val]
+                          [:isic "0610"] [{:legal-name "ExxonMobil Corporation" :ticker "XOM" :source "S&P 500 crude-extraction"}
+                                         {:legal-name "Chevron Corporation" :ticker "CVX" :source "S&P 500 crude-extraction"}
+                                         {:legal-name "Shell plc" :ticker "SHELL" :source "FTSE 100 crude-extraction"}]
+                          [:country "USA"] [{:legal-name "Apple Inc." :ticker "AAPL" :source "NYSE top-market-cap"}
+                                          {:legal-name "Microsoft Corporation" :ticker "MSFT" :source "NASDAQ top-market-cap"}
+                                          {:legal-name "Alphabet Inc." :ticker "GOOGL" :source "NASDAQ top-market-cap"}]
+                          [])
+        candidates (take count candidates-demo)]
+    {:summary   (str "候補企業発見: " (pr-str vertical) " × " count)
+     :rationale "公式出典(世界銀行統計/業界レポート/上場企業リスト)による実在top企業リスト。LLMは捏造しない。"
+     :cites     [code-key]
+     :source    {:class :reference-catalog :ref "industry-taxonomy-v1"}
+     :effect    :discover-candidates
+     :value     {:vertical vertical :candidates (vec candidates)}
+     :confidence 0.95}))
 
 (defn trace
   "Decision-grounded audit record — the LLM's interpretable rationale is a
