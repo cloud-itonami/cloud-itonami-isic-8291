@@ -240,6 +240,14 @@
    :stake     :correction-request
    :confidence 0.5})
 
+;; Forward declaration: `propose-discover-candidates` is defined further
+;; below (near `mock-advisor`/`llm-advisor`) but `infer` (immediately
+;; below) already needs to reference it in its `case` dispatch. Without
+;; this, the whole ns fails to COMPILE (not just at runtime) — Clojure
+;; resolves symbols at compile time, in file order, and has no forward
+;; visibility into a `defn-` further down the same file.
+(declare propose-discover-candidates)
+
 (defn infer
   "Route a request to the right proposal generator.
   request: {:op kw :subject id ...op-specific...}"
