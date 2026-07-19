@@ -9,12 +9,30 @@
  ;; this as a real build break).
  ;;
  ;; http-kit + jsonista (ADR-2607110400 addendum 5, dossier.companies-house)
- ;; power the ONE live-data seam this actor has (UK Companies House) —
- ;; the same JVM host-fn pair kotoba-lang/langchain's langchain.jvm already
- ;; uses for the same reason (langchain's pure core stays zero-dep; a real
- ;; consuming actor like this one brings its own HTTP stack).
+ ;; power the live-data seams this actor has (UK Companies House, Common
+ ;; Crawl, net-kotobase web.search, ...) — the same JVM host-fn pair
+ ;; kotoba-lang/langchain's langchain.jvm already uses for the same reason
+ ;; (langchain's pure core stays zero-dep; a real consuming actor like this
+ ;; one brings its own HTTP stack).
+ ;;
+ ;; org-chainagnostic-cacao (ADR-2607192200, dossier.kotobase-identity/
+ ;; dossier.web-search) is a `:git/url`+`:git/sha` dep, NOT `:local/root`
+ ;; like langgraph/langchain above — it resolves that way on purpose
+ ;; (ADR-2607022400: "cacao resolves standalone when consumed as a git dep
+ ;; from a clean clone with no monorepo siblings present"), so a worktree
+ ;; without an `orgs/kotoba-lang/org-chainagnostic-cacao` sibling checked
+ ;; out (e.g. a CI job, or an isolated agent worktree per CLAUDE.md's
+ ;; parallel-agent-workflow section) still resolves it with no extra CI
+ ;; checkout step, unlike langgraph/langchain above which DO need one (see
+ ;; .github/workflows/ci.yml). Brings `ed25519.core`/`cacao.core`
+ ;; transitively (org-ietf-ed25519, org-ietf-cbor, both also git deps of
+ ;; org-chainagnostic-cacao's own deps.edn) — no separate entry needed for
+ ;; either.
  :deps {io.github.kotoba-lang/langgraph
         {:local/root "../../kotoba-lang/langgraph"}
+        io.github.kotoba-lang/org-chainagnostic-cacao
+        {:git/url "https://github.com/kotoba-lang/org-chainagnostic-cacao.git"
+         :git/sha "ea09687bd7652cb16dad10a724186abe0daaebc5"}
         http-kit/http-kit {:mvn/version "2.8.0"}
         metosin/jsonista  {:mvn/version "0.3.11"}}
  :aliases
