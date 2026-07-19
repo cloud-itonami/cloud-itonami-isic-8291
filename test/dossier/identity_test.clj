@@ -1,5 +1,5 @@
 (ns dossier.identity-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [dossier.identity :as id]
             [clojure.java.io :as io]
             [clojure.edn :as edn]))
