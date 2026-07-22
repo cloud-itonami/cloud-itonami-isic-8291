@@ -1,0 +1,44 @@
+{:itonami.blueprint/id "cloud-itonami-isic-8291"
+ :itonami.blueprint/name "Activities of collection agencies and credit bureaus (corporate/compliance intelligence)"
+ :itonami.blueprint/isic-rev5 "8291"
+ :itonami.blueprint/isic-citation "ISIC Rev.4 8291 explanatory note: \"activities of collection agencies and credit bureaus\" (https://unstats.un.org/unsd/classifications/Econ/Detail/EN/27/8291)"
+ :itonami.blueprint/domain :compliance/corporate-intelligence
+ :itonami.blueprint/license "AGPL-3.0-or-later"
+ :itonami.blueprint/social-impact [:transparency :regulatory-transparency :accountability :data-sovereignty]
+ :itonami.blueprint/governor :disclosure-governor
+ :itonami.blueprint/robotics false
+ :itonami.blueprint/required-technologies [:identity :audit-ledger]
+ :itonami.blueprint/status :public-oss
+ :itonami.blueprint/maturity :implemented
+ :itonami.blueprint/implemented-slice
+ "Dossier-LLM ⊣ DisclosureGovernor (dossier.policy, six checks: scope-gate ·
+  source-basis · licensed-disclosure · confidence-floor · high-stakes-gate ·
+  correction-requests-always-escalate), langgraph StateGraph
+  (dossier.operation/build-graph), append-only audit ledger
+  (dossier.store/ledger + append-ledger!, MemStore/DatomicStore parity).
+  Four governed disclosure ops (:disclosure/query,
+  :disclosure/screen-name, :disclosure/ownership-chain,
+  :disclosure/relationship-check), each gated by a licensed-tier check with
+  no bypass. A phase 0→3 staged-autonomy gate (dossier.phase) sits on top
+  of the governor and can only ever narrow, never widen, what the governor
+  already allowed. Schema is structurally scoped to professional/official-
+  capacity public-record facts only — no field exists anywhere for
+  private-life data (dossier.store's schema + dossier.policy's scope-gate
+  as defense in depth).
+
+  Real (not stubbed) integrations: dossier.kotobase-identity + dossier.edge
+  (cacao/cacao-mint/cbor/base58) mint this actor's own CACAO/DID identity
+  against net-kotobase (ADR-2607192200); dossier.web-search calls
+  net-kotobase's live web-search client; dossier.gleif and
+  dossier.companies-house chain real fallbacks onto the GLEIF LEI Registry
+  API (no key required) and the UK Companies House public data API
+  (free key) so lookups can be answered from live public registries, not
+  only seeded fixtures — local/seeded data always wins when present, so
+  the live fallback can only add coverage, never override an existing
+  answer; dossier.sec-edgar, dossier.commoncrawl, dossier.houjin-bangou and
+  dossier.lei-site-archive add further live/public-source lookups. 165
+  tests / 620 assertions green (`clojure -M:dev:test`), demo runnable
+  end-to-end (`clojure -M:dev:run`). This is the corporate-intelligence
+  provider four other fleet blueprints
+  (cloud-itonami-isic-6910/6810/6499/6512/6419) already call for KYC/
+  sanctions screening via :disclosure/screen-name."}
