@@ -24,10 +24,9 @@
   The ledger stays append-only on every backend — 'who disclosed what to
   whom, on what contract, on what source basis' is always a query over an
   immutable log."
-  (:require #?(:clj  [clojure.edn :as edn]
-               :cljs [cljs.reader :as edn])
-            [clojure.string :as str]
-            [langchain.db :as d]))
+  (:require [clojure.string :as str]
+            [langchain.db :as d]
+            [langchain-store.core :as ls]))
 
 (defprotocol Store
   (company [s id])
@@ -177,8 +176,11 @@
    :contract/tenant {:db/unique :db.unique/identity}
    :ledger/seq      {:db/unique :db.unique/identity}})
 
-(defn- enc [v] (pr-str v))
-(defn- dec* [s] (when s (edn/read-string s)))
+;; EDN-blob codec -- delegates to kotoba-lang/langchain-store's shared
+;; implementation (ADR-2607141600) instead of hand-rolling the
+;; `pr-str`/`edn/read-string` two-liner ~190 sibling stores duplicated.
+(def ^:private enc ls/enc)
+(def ^:private dec* ls/dec*)
 
 (defn- company->tx [{:keys [id legal-name jurisdiction registration-no status source flags lei]}]
   (cond-> {:company/id id}

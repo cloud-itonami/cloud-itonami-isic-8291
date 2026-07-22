@@ -30,6 +30,12 @@
  ;; either.
  :deps {io.github.kotoba-lang/langgraph
         {:local/root "../../kotoba-lang/langgraph"}
+        ;; shared langchain.db store seam (EDN-blob codec) -- store.cljc's
+        ;; DatomicStore delegates its enc/dec* to this instead of
+        ;; hand-rolling the pr-str/edn.read-string two-liner ~190 sibling
+        ;; stores duplicated (ADR-2607141600).
+        io.github.kotoba-lang/langchain-store
+        {:local/root "../../kotoba-lang/langchain-store"}
         io.github.kotoba-lang/org-chainagnostic-cacao
         {:git/url "https://github.com/kotoba-lang/org-chainagnostic-cacao.git"
          :git/sha "ea09687bd7652cb16dad10a724186abe0daaebc5"}
