@@ -9,10 +9,8 @@
   (let [db (store/seed-db)]
     [db (op/build db)]))
 
-(deftest discover-candidates-isic-0610-end-to-end
-  "Call :disclosure/discover-candidates for crude oil (ISIC-0610),
-   verify StateGraph execution completes."
-
+(deftest ^{:doc "Call :disclosure/discover-candidates for crude oil (ISIC-0610),
+   verify StateGraph execution completes."} discover-candidates-isic-0610-end-to-end
   (let [[db actor] (fresh)
         result (g/run* actor {:request {:op :disclosure/discover-candidates
                                         :vertical {:isic "0610"}
