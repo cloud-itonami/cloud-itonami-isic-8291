@@ -11,7 +11,7 @@
 ;; - Progress ledger update deferred to post-scaffold.
 
 (require '[clojure.edn :as edn]
-         '[clojure.string :as str])
+         '[kotoba.lang.text :as str])
 
 (def cli-flags
   (reduce (fn [m arg]
@@ -54,7 +54,7 @@
 
 (defn scaffold-lei-repo [lei company-name]
   "Scaffold cloud-itonami-lei-<lei> repo skeleton (no push in this pass)."
-  (let [repo-name (str "cloud-itonami-lei-" (str/lower-case lei))
+  (let [repo-name (str "cloud-itonami-lei-" (str/lower lei))
         repo-path (str root "/orgs/cloud-itonami/" repo-name)]
     (when-not (:dry-run cli-flags)
       (log "  Scaffolding repo:" repo-name)
