@@ -6,7 +6,7 @@
   HWUPKR0MPOU8FGXBT394'` and a `filter[entity.legalName]` search, before
   this client was written) — no network access needed, same discipline as
   `dossier.companies-house-test`."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [dossier.gleif :as gleif]))
 
@@ -53,8 +53,8 @@
      ;; GLEIF's real `filter[entity.legalName]` matches case-insensitively
      ;; (confirmed empirically 2026-07-14) -- this fake mirrors that so
      ;; `find-lei-by-name`'s own case-insensitive re-match can be tested.
-     (when (= (str/lower-case (get q "filter[entity.legalName]" ""))
-              (str/lower-case "Kaigan Freight Systems Inc (demo)"))
+     (when (= (str/lower (get q "filter[entity.legalName]" ""))
+              (str/lower "Kaigan Freight Systems Inc (demo)"))
        {:data [kaigan-record
                {:type "lei-records" :id "969500DEMO0USA99999Z"
                 :attributes {:lei "969500DEMO0USA99999Z"

@@ -39,7 +39,7 @@
             [dossier.gleif :as gleif]
             [dossier.sec-edgar :as sec]
             [dossier.houjin-bangou :as hb]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (defn- gbr-id? [id]
   (and (string? id) (str/starts-with? id "gbr-")))

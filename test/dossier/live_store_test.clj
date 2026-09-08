@@ -4,7 +4,7 @@
   for names/ids local has nothing for, and a nil fetch-fn degrades to
   exactly the undecorated local store — entirely offline via injected fake
   fetch-fns."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [dossier.store :as store]
             [dossier.live-store :as live]))
@@ -37,8 +37,8 @@
 (def zenith-lei-routes
   {"/lei-records"
    (fn [q]
-     (when (= (str/lower-case (get q "filter[entity.legalName]" ""))
-              (str/lower-case "Zenith Trading Co (demo)"))
+     (when (= (str/lower (get q "filter[entity.legalName]" ""))
+              (str/lower "Zenith Trading Co (demo)"))
        {:data [zenith-lei-record]}))
    "/lei-records/969500DEMO0ZEN00001A"
    (fn [_] {:data zenith-lei-record})})

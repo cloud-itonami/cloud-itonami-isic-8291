@@ -5,7 +5,7 @@
   kotoba-lang/kotobase-commoncrawl-actor's `commoncrawl.identity-test`
   (the reference this ns's design is ported from)."
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [dossier.kotobase-identity :as kid]
             [cacao.core :as cacao]))
 

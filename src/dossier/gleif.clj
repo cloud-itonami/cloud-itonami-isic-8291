@@ -36,7 +36,7 @@
   countries most likely to appear among GLEIF registrants relevant to this
   actor's existing R0 jurisdictions plus other major economies — a country
   not in the map degrades `:jurisdiction` to nil, never a fabricated guess."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [org.httpkit.client :as http]
             [jsonista.core :as j]))
 
@@ -101,8 +101,8 @@
   letter modulo case. Never a fuzzy guess promoted to an answer, same
   discipline as `dossier.companies-house/find-company-by-name`."
   [fetch-fn name]
-  (let [needle (str/lower-case name)]
-    (some #(when (= needle (str/lower-case (get-in % [:attributes :entity :legalName :name] "")))
+  (let [needle (str/lower name)]
+    (some #(when (= needle (str/lower (get-in % [:attributes :entity :legalName :name] "")))
              %)
           (search-by-name fetch-fn name))))
 
@@ -151,7 +151,7 @@
        :legal-name (get-in entity [:legalName :name])
        :jurisdiction (jurisdiction-of country)
        :registration-no (:registeredAs entity)
-       :status (some-> (:status entity) str/lower-case keyword)
+       :status (some-> (:status entity) str/lower keyword)
        :lei lei
        :source {:class :official-registry
                 :ref (str base-url "/lei-records/" lei)}

@@ -45,7 +45,7 @@
   interface symmetry with the other client modules, not because a key
   is ever needed."
   (:require [org.httpkit.client :as http]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [jsonista.core :as j]))
 
 (def base-url "https://index.commoncrawl.org")

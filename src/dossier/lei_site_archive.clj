@@ -36,7 +36,7 @@
   `cloud-itonami-lei-<LEI>` repo for (call `dossier.commoncrawl`
   directly for a company outside that set)."
   (:require [org.httpkit.client :as http]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [clojure.edn :as edn]))
 
 (def raw-base-url "https://raw.githubusercontent.com/cloud-itonami")
@@ -48,13 +48,13 @@
   dossier-canonical `lei-<LEI>` id (`dossier.gleif/->company`'s `:id`
   shape) -- always returns the bare, uppercase LEI."
   [lei-or-id]
-  (str/upper-case (if (str/starts-with? lei-or-id "lei-") (subs lei-or-id 4) lei-or-id)))
+  (str/upper (if (str/starts-with? lei-or-id "lei-") (subs lei-or-id 4) lei-or-id)))
 
 (defn repo-name-of
   "The real `cloud-itonami-lei-*` repo naming convention (verified
   against the actual 109 repos, ADR-2607110300): lowercase LEI."
   [lei-or-id]
-  (str "cloud-itonami-lei-" (str/lower-case (lei-of lei-or-id))))
+  (str "cloud-itonami-lei-" (str/lower (lei-of lei-or-id))))
 
 (defn live-http-fn
   "The real fetch fn: a raw-content path -> the file's text body, or nil

@@ -5,7 +5,7 @@
   This namespace only renders the approved columns, so a disclosure can
   never exceed the licensed tier — the Dun & Bradstreet/World-Check 'company
   profile' feature, with the tier-column policy fixed in code."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [dossier.store :as store]))
 
 (defn render-profile
