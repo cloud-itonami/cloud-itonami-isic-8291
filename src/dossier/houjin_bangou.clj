@@ -58,7 +58,7 @@
   R0 restraint)."
   (:require [org.httpkit.client :as http]
             [clojure.xml :as xml]
-            [clojure.string :as str])
+            [kotoba.lang.text :as str])
   (:import (java.io ByteArrayInputStream)))
 
 (def base-url "https://api.houjin-bangou.nta.go.jp")
