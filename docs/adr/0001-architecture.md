@@ -80,7 +80,7 @@ intake → advise(Dossier-LLM) → govern(DisclosureGovernor) → decide ─┬�
 ### 4. R0 の正直なスコープ(捏造禁止)
 
 `cloud-itonami-M6910` の「10法域のみ spec-basis」に倣い、出典カタログ
-(`src/dossier/facts.cljc`)は実在する6つの公開一次情報源のみ(日本 法人番号
+(`src/dossier/facts.kotoba`)は実在する6つの公開一次情報源のみ(日本 法人番号
 公表サイト・UK Companies House・Germany Unternehmensregister・Estonia
 e-Business Register・USA SEC EDGAR・EU consolidated sanctions list)。
 `facts/coverage` が常に正直に現状を報告し、拡張は実在するソースの追記でのみ
