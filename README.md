@@ -32,7 +32,7 @@ facts only**: company registry data, officers/directors/UBO where legally
 disclosed, government agencies and officials **in their official role**,
 publicly-disclosed ownership/directorship/JV relationships, and business
 contact information. Every fact must cite a real, verifiable source
-(`src/dossier/facts.cljc`).
+(`src/dossier/facts.kotoba`).
 
 **There is no field anywhere in this schema for private-life data** — home
 address, family, health, political/religious opinion, sexual orientation, or

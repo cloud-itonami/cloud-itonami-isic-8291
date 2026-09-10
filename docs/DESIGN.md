@@ -35,9 +35,9 @@ DossierSystem (root supervisor)
 ├── GraphActor ……… 関係性(株主/役員/JV/監督)の投影(relationship-graph-text)
 │
 ├── OperationActor[op] … ★ 1操作 = 1 actor run; Dossier-LLM 封じ込め ★
-│     ├── Dossier-LLM (sealed)   proposal only(src/dossier/llm.cljc)
-│     ├── DisclosureGovernor     INDEPENDENT ゲート(src/dossier/policy.cljc)
-│     ├── Committer              SSoT/台帳への書き込み(src/dossier/store.cljc)
+│     ├── Dossier-LLM (sealed)   proposal only(src/dossier/llm.kotoba)
+│     ├── DisclosureGovernor     INDEPENDENT ゲート(src/dossier/policy.kotoba)
+│     ├── Committer              SSoT/台帳への書き込み(src/dossier/store.kotoba)
 │     └── Recorder                監査台帳(append-only)
 │
 ├── ReviewActor ……… 人間レビュー(高リスク開示・訂正申立ての interrupt を受ける)
@@ -56,7 +56,7 @@ DossierSystem (root supervisor)
 
 ## 3. OperationActor 内部(Dossier-LLM ラッパー)
 
-`src/dossier/operation.cljc` の langgraph-clj StateGraph として実装。
+`src/dossier/operation.kotoba` の langgraph-clj StateGraph として実装。
 **1 run = 1 操作** — 有界で監査可能、無限内部ループを持たない。
 
 ```
@@ -89,7 +89,7 @@ intake → advise → govern → decide ─┬─ commit ───────�
 
 ## 4. DisclosureGovernor(独立検閲層)
 
-`src/dossier/policy.cljc`。LLM とは別経路で、提案を可決/拒否/escalate に判定する。
+`src/dossier/policy.kotoba`。LLM とは別経路で、提案を可決/拒否/escalate に判定する。
 
 ```clojure
 (policy/check request context proposal store)
@@ -113,7 +113,7 @@ intake → advise → govern → decide ─┬─ commit ───────�
 
 ## 5. SSoT と監査台帳
 
-`src/dossier/store.cljc`。dev は in-mem の EDN 事実層(本番は Datomic)。
+`src/dossier/store.kotoba`。dev は in-mem の EDN 事実層(本番は Datomic)。
 
 - **entities**: `companies` `officials`(capacity=officer|director|ubo|
   government-official) `agencies` `relationships`(edge) `contracts`(licensing)。
@@ -126,22 +126,22 @@ intake → advise → govern → decide ─┬─ commit ───────�
 
 ## 6. 開示(governed read)
 
-`src/dossier/report.cljc`。`render-profile` は DisclosureGovernor が承認した
+`src/dossier/report.kotoba`。`render-profile` は DisclosureGovernor が承認した
 列のみを出力、`relationship-graph-text` は関係性が承認された時のみ組織図
 スタイルで投影する。列ポリシーはコードで固定される。
 
 ## 7. デモ(`clojure -M:dev:run`)
 
-`src/dossier/sim.cljc` が5操作を actor に通す(§sim.cljc docstring 参照):
+`src/dossier/sim.kotoba` が5操作を actor に通す(§sim.cljc docstring 参照):
 正当な登記アップサート → commit、出典なし関係性ドラフト → hold、
 tier超過/未契約の開示 → hold、制裁フラグ対象への開示 → 人間承認 → commit、
 訂正申立て → 常に人間承認 → commit。
 
 ## 8. テスト(`clojure -M:dev:test`)
 
-`test/dossier/policy_contract_test.clj` が**ガバナンス契約を実行可能**にする。
-`test/dossier/phase_test.clj` が段階導入と「訂正は恒久的に人間専用」を保証。
-`test/dossier/facts_test.clj` が出典カタログ自体の正直さ(捏造禁止)を保証。
+`test/dossier/policy_contract_test.kotoba` が**ガバナンス契約を実行可能**にする。
+`test/dossier/phase_test.kotoba` が段階導入と「訂正は恒久的に人間専用」を保証。
+`test/dossier/facts_test.kotoba` が出典カタログ自体の正直さ(捏造禁止)を保証。
 
 ## 9. 実装と業態の対応(D&B/Orbis/World-Check → dossier actor)
 
