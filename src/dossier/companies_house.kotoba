@@ -4,7 +4,7 @@
   (`dossier.facts`, `:gbr-companies-house` entry). JVM-only plain `.clj`
   (`org.httpkit.client` + `jsonista` have no cljs equivalent here) — the
   same host-fn-injection shape `langchain.jvm/jvm-http-fn` already uses in
-  this workspace, so this whole actor fleet's JVM-via-`clojure -M:dev:test`
+  this workspace, so this whole actor fleet's JVM-via-`kbb -M:dev:test`
   convention stays intact and tests never need a real API key or network
   access (the fetch fn is always injected; `test/dossier/companies_house_
   test.clj` injects a canned fake). Plain `.clj`, not `.cljc`, for the same

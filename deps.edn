@@ -54,7 +54,7 @@
         {io.github.kotoba-lang/langchain
          {:git/url "https://github.com/kotoba-lang/langchain.git"
          :git/sha "51e7b61ec3d55e917d5dc77dac145197cb3340df"}}}
-  ;; clojure -M:dev:run  → drive the demo through one OperationActor
+  ;; kbb -M:dev:run  → drive the demo through one OperationActor
   :run {:main-opts ["-m" "dossier.sim"]}
   :test {:extra-paths ["test"]
          :extra-deps {io.github.cognitect-labs/test-runner

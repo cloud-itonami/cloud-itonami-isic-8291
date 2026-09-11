@@ -37,8 +37,8 @@
   the live fallback can only add coverage, never override an existing
   answer; dossier.sec-edgar, dossier.commoncrawl, dossier.houjin-bangou and
   dossier.lei-site-archive add further live/public-source lookups. 165
-  tests / 620 assertions green (`clojure -M:dev:test`), demo runnable
-  end-to-end (`clojure -M:dev:run`). This is the corporate-intelligence
+  tests / 620 assertions green (`kbb -M:dev:test`), demo runnable
+  end-to-end (`kbb -M:dev:run`). This is the corporate-intelligence
   provider four other fleet blueprints
   (cloud-itonami-isic-6910/6810/6499/6512/6419) already call for KYC/
   sanctions screening via :disclosure/screen-name."}

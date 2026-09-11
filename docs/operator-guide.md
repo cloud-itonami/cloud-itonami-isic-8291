@@ -8,8 +8,8 @@ This guide is for people who want to start an open business from
 ```bash
 git clone https://github.com/cloud-itonami/cloud-itonami-isic-8291
 cd cloud-itonami-isic-8291
-clojure -M:dev:test
-clojure -M:dev:run
+kbb -M:dev:test
+kbb -M:dev:run
 ```
 
 The default demo uses entirely fictitious data. Production company/official
@@ -34,7 +34,7 @@ adapter, and every fact must carry a real, verifiable source citation.
   (`dossier.gleif`) by default — GLEIF's public `/lei-records` API needs no
   API key at all, so this live source is on the moment you build the actor
   with `(live/live-store)` instead of a bare `MemStore`/`DatomicStore`.
-  Verified against the real production API 2026-07-14 (`clojure -M:dev -e
+  Verified against the real production API 2026-07-14 (`kbb -M:dev -e
   "(require '[dossier.gleif :as g]) (println (g/->company (g/lei-record
   (g/live-http-fn) \"HWUPKR0MPOU8FGXBT394\")))"` — Apple Inc.'s real LEI —
   returned a correctly-mapped company). Coverage is broad (2.7M+ entities
@@ -66,7 +66,7 @@ adapter, and every fact must carry a real, verifiable source citation.
   `submissions` API has no entity-name search endpoint at all, so
   `store/company-by-name` never resolves a SEC-EDGAR-only name. Verified
   against the real production API 2026-07-15 (`SEC_EDGAR_USER_AGENT="dossier
-  jun784@gmail.com" clojure -M:dev -e "(require '[dossier.sec-edgar :as
+  jun784@gmail.com" kbb -M:dev -e "(require '[dossier.sec-edgar :as
   sec]) (println (sec/->company (sec/submissions (sec/live-http-fn
   (sec/env-user-agent)) 320193)))"` — Apple Inc.'s real CIK 320193 —
   returned a correctly-mapped company; Microsoft's CIK 789019 verified the
@@ -77,8 +77,8 @@ adapter, and every fact must carry a real, verifiable source citation.
 - configure Datomic Local, kotoba-server or an equivalent durable SSoT
 - configure the LLM adapter through environment variables or secret manager
 - define customer contract tenants/tiers and RBAC rules
-- run `clojure -M:dev:test`
-- run `clojure -M:lint`
+- run `kbb -M:dev:test`
+- run `kbb -M:lint`
 - verify audit-ledger export
 - document backup and restore
 - document incident response

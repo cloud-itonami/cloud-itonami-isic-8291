@@ -18,7 +18,7 @@
          を兼務。cloud-itonami-isic-6621/6622の利益相反
          チェック向け)
 
-  Run: clojure -M:dev:run"
+  Run: kbb -M:dev:run"
   (:require [langgraph.graph :as g]
             [dossier.store :as store]
             [dossier.operation :as op]

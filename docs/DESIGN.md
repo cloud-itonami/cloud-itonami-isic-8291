@@ -130,14 +130,14 @@ intake → advise → govern → decide ─┬─ commit ───────�
 列のみを出力、`relationship-graph-text` は関係性が承認された時のみ組織図
 スタイルで投影する。列ポリシーはコードで固定される。
 
-## 7. デモ(`clojure -M:dev:run`)
+## 7. デモ(`kbb -M:dev:run`)
 
 `src/dossier/sim.kotoba` が5操作を actor に通す(§sim.cljc docstring 参照):
 正当な登記アップサート → commit、出典なし関係性ドラフト → hold、
 tier超過/未契約の開示 → hold、制裁フラグ対象への開示 → 人間承認 → commit、
 訂正申立て → 常に人間承認 → commit。
 
-## 8. テスト(`clojure -M:dev:test`)
+## 8. テスト(`kbb -M:dev:test`)
 
 `test/dossier/policy_contract_test.kotoba` が**ガバナンス契約を実行可能**にする。
 `test/dossier/phase_test.kotoba` が段階導入と「訂正は恒久的に人間専用」を保証。

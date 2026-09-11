@@ -4,7 +4,7 @@
   same shape as `dossier.companies-house`/`dossier.gleif`: JVM-only plain
   `.clj` (`org.httpkit.client` + `jsonista`), `fetch-fn` (`{:path :query}
   -> parsed-json|nil`) injected so production uses `live-http-fn` and tests
-  inject a canned fake — no real network access in `clojure -M:dev:test`
+  inject a canned fake — no real network access in `kbb -M:dev:test`
   (`test/dossier/sec_edgar_test.clj`).
 
   Scope, precisely (do not confuse with a different SEC EDGAR API): this
