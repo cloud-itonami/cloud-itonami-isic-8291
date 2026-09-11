@@ -1,9 +1,9 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; LEI discovery automation for cloud-itonami-lei-* repo scaffold.
 ;; Part C: Reads 90-docs/adr/2607110300-*.progress.edn, calls isic-8291 :disclosure/discover-candidates,
 ;; fetches GLEIF + ToS (via external curl), scaffolds repos, updates progress.edn.
 ;;
-;; Usage: nbb bin/collect.cljs [--dry-run] [--scope isic|isco|all]
+;; Usage: kbb --backend sci bin/collect.cljk [--dry-run] [--scope isic|isco|all]
 ;;
 ;; LIMITATIONS (honest):
 ;; - HTTP fetching is shell-based (curl). JS-rendered SPAs fail; queued to retry-js-rendered.edn.

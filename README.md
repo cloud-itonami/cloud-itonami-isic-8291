@@ -113,9 +113,9 @@ correction the DisclosureGovernor would reject.
 ## Run
 
 ```bash
-clojure -M:dev:test   # governor contract · store parity · phases · facts
-clojure -M:dev:run    # 5-operation demo through one OperationActor
-clojure -M:lint
+kbb -M:dev:test   # governor contract · store parity · phases · facts
+kbb -M:dev:run    # 5-operation demo through one OperationActor
+kbb -M:lint
 ```
 
 ## Live data (GLEIF LEI + UK Companies House)
@@ -130,11 +130,11 @@ so this can only ADD coverage, never change an existing answer.
 ```bash
 # GLEIF needs no API key at all — this line alone already chains the live
 # GLEIF fallback (2.7M+ legal entities worldwide, ISO 17442):
-clojure -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
+kbb -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
 
 # add the Companies House fallback too by also setting its free key:
 export COMPANIES_HOUSE_API_KEY=...   # get one free at the URL above
-clojure -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
+kbb -M:dev -e "(require '[dossier.live-store :as live] '[dossier.operation :as op]) (op/build (live/live-store))"
 ```
 
 Without `COMPANIES_HOUSE_API_KEY`, the CH fallback is simply absent (GLEIF

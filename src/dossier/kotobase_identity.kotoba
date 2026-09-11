@@ -28,7 +28,7 @@
       this repo has no ClojureScript/shadow-cljs build at all (deps.edn is
       JVM-.clj-only, no :cljs/shadow-cljs config anywhere), so these
       namespaces cannot be loaded/compiled here, let alone called, from
-      `clojure -M:test`/`-M:run`. dossier.identity itself never requires
+      `kbb -M:test`/`-M:run`. dossier.identity itself never requires
       them either -- the two halves (fake did-key generator, unreachable
       real mint/verify) are disconnected.
 

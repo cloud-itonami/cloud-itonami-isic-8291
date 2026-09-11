@@ -5,7 +5,7 @@
   `dossier.companies-house`: JVM-only plain `.clj` (`org.httpkit.client` +
   `jsonista`), `fetch-fn` (`{:path :query} -> parsed-json|nil`) injected so
   production uses `live-http-fn` and tests inject a canned fake — no real
-  network access in `clojure -M:dev:test` (`test/dossier/gleif_test.clj`).
+  network access in `kbb -M:dev:test` (`test/dossier/gleif_test.clj`).
 
   Unlike Companies House, GLEIF's public `/lei-records` API needs NO API
   key at all — LEI records are open reference data by design (ISO 17442;
