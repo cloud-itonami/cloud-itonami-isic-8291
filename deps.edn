@@ -58,8 +58,9 @@
  {;; offline workspace dev — pin transitive langchain to local checkout
   :dev {:override-deps
         {io.github.kotoba-lang/langchain
-         {:git/url "https://github.com/kotoba-lang/langchain.git"
-         :git/sha "51e7b61ec3d55e917d5dc77dac145197cb3340df"}}}
+        {:git/url "https://github.com/kotoba-lang/kotoba.git"
+         :git/sha "38654600c00caea2caec9ec0650625f2f6a69378"
+         :deps/root "lib/kotoba.langchain"}}}
   ;; kbb -M:dev:run  → drive the demo through one OperationActor
   :run {:main-opts ["-m" "dossier.sim"]}
   :test {:extra-paths ["test"]
