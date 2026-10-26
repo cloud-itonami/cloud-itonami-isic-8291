@@ -34,18 +34,21 @@
         ;; this repo silently rides whatever a sibling happens to name.
         io.github.kotoba-lang/text {:git/sha "73bdb13ae7a3d004b44bca08be03a3191157a38f"}
        io.github.kotoba-lang/langgraph
-        {:git/url "https://github.com/kotoba-lang/langgraph.git"
-         :git/sha "577a59a9d5eb3ef90b81342f4673973f481ff7f4"}
+        {:git/url "https://github.com/kotoba-lang/kotoba.git"
+         :git/sha "e09192276fd6a111dfb9959bfc75ddeba555e840"
+         :deps/root "lib/kotoba.langgraph"}
         ;; shared langchain.db store seam (EDN-blob codec) -- store.cljc's
         ;; DatomicStore delegates its enc/dec* to this instead of
         ;; hand-rolling the pr-str/edn.read-string two-liner ~190 sibling
         ;; stores duplicated (ADR-2607141600).
         io.github.kotoba-lang/langchain-store
-        {:git/url "https://github.com/kotoba-lang/langchain-store.git"
-         :git/sha "69e99605e66d719cec4bfa11530119e170f551b3"}
+        {:git/url "https://github.com/kotoba-lang/kotoba.git"
+         :git/sha "e09192276fd6a111dfb9959bfc75ddeba555e840"
+         :deps/root "lib/kotoba.langchainStore"}
         io.github.kotoba-lang/org-chainagnostic-cacao
-        {:git/url "https://github.com/kotoba-lang/org-chainagnostic-cacao.git"
-         :git/sha "ea09687bd7652cb16dad10a724186abe0daaebc5"}
+        {:git/url "https://github.com/kotoba-lang/kotoba.git"
+         :git/sha "e09192276fd6a111dfb9959bfc75ddeba555e840"
+         :deps/root "lib/org.chainagnostic.cacao"}
         http-kit/http-kit {:mvn/version "2.8.0"}
         metosin/jsonista  {:mvn/version "0.3.11"}}
  :aliases
